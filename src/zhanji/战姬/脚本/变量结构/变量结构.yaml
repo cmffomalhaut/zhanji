@@ -1,0 +1,600 @@
+import { registerMvuSchema } from 'https://testingcf.jsdelivr.net/gh/StageDog/tavern_resource/dist/util/mvu_zod.js';
+
+// ====================================================================
+// 1. 工具函数
+// ====================================================================
+
+function parseSafeNumber(val, defaultVal = 0) {
+  if (typeof val === 'number') return isNaN(val) ? defaultVal : val;
+  if (typeof val === 'string') {
+    const cleaned = val.replace(/[^\d.-]/g, '');
+    const num = Number(cleaned);
+    return isNaN(num) ? defaultVal : num;
+  }
+  return defaultVal;
+}
+
+// ====================================================================
+// 2. 计算核心
+// ====================================================================
+
+const getRules = () => ({
+  QUALITY: { 'E': [225, 10], 'D': [260, 12], 'C': [305, 14], 'B': [350, 16], 'A': [400, 18], 'S': [450, 20] },
+  TALENT: { '平庸': 0.9, '普通': 1.0, '优秀': 1.1, '天才': 1.2 },
+  COMBAT_TYPE: {
+    '均衡型': [0.20, 0.20, 0.20, 0.20, 0.20],
+    '强攻型': [0.30, 0.20, 0.10, 0.10, 0.30],
+    '重盾型': [0.10, 0.40, 0.10, 0.30, 0.10],
+    '魔导型': [0.10, 0.10, 0.40, 0.30, 0.10],
+    '敏捷型': [0.20, 0.10, 0.20, 0.10, 0.40]
+  },
+  NATURE: {
+    '固执': [0, 2], '孤僻': [0, 1], '勇敢': [0, 4], '调皮': [0, 3],
+    '内敛': [2, 0], '稳重': [2, 1], '冷静': [2, 4], '马虎': [2, 3],
+    '胆小': [4, 0], '急躁': [4, 1], '开朗': [4, 2], '天真': [4, 3],
+    '大胆': [1, 0], '悠闲': [1, 4], '淘气': [1, 2],
+    '温和': [3, 0], '自大': [3, 4], '慎重': [3, 2],
+    '坦率': [null, null], '认真': [null, null], '害羞': [null, null]
+  },
+  FORM_BONUS: {
+    '无': { atk: 0, def: 0, spA: 0, spD: 0, spd: 0 },
+    '天使化': { atk: 0, def: 0, spA: 0.25, spD: 0.25, spd: 0.25 },
+    '恶魔化': { atk: 0, def: 0, spA: 0.25, spD: 0.25, spd: 0.25 },
+    '精灵化': { atk: 0, def: 0, spA: 0.20, spD: 0.20, spd: 0.20 },
+    '兽人化': { atk: 0.20, def: 0.20, spA: 0, spD: 0, spd: 0.20 }
+  },
+  FORM_ELEMENT_RESTRICTION: {
+    '天使化': ['光'],
+    '恶魔化': ['暗'],
+    '精灵化': ['地', '火', '水', '风', '光', '暗'],
+    '兽人化': ['地', '火', '水', '风', '光', '暗']
+  },
+  // 收藏室规则
+  COLLECTION_CAPACITY: { 1: 5, 2: 10, 3: 30, 4: 50, 5: 100 },
+  COLLECTION_AFFECTION_BONUS: { 1: 1, 2: 2, 3: 3, 4: 4, 5: 5 },
+  // 工作区规则
+  WORK_AREA_NAMES: { 1: '咖啡厅', 2: '餐厅', 3: '高级餐厅', 4: '豪华会所', 5: '顶级俱乐部' },
+  WORK_AREA_CAPACITY: { 1: 3, 2: 4, 3: 5, 4: 6, 5: 8 },
+  WORK_AREA_INCOME: { 1: 50, 2: 100, 3: 200, 4: 350, 5: 500 }
+});
+
+function calculateLevelFromExp(currentExp) {
+  const safeExp = parseSafeNumber(currentExp, 0);
+  const exp = Math.max(0, safeExp);
+  let level = Math.floor((1 + Math.sqrt(1 + 0.08 * exp)) / 2);
+  level = _.clamp(level, 1, 100);
+  const nextLevelExp = 50 * level * (level + 1);
+  return { level: level, maxExp: nextLevelExp };
+}
+
+function calculateMinExpForLevel(targetLevel) {
+  const lv = _.clamp(targetLevel, 1, 100);
+  if (lv === 1) return 0;
+  const term = 2 * lv - 1;
+  return Math.floor(12.5 * (term * term - 1));
+}
+
+function calculateStats(charData, realLevel) {
+  const RULES = getRules();
+
+  const quality = RULES.QUALITY[charData.品质] ? charData.品质 : 'E';
+  const talent = RULES.TALENT[charData.资质] ? charData.资质 : '普通';
+  const type = RULES.COMBAT_TYPE[charData.战斗类型] ? charData.战斗类型 : '均衡型';
+  const nature = RULES.NATURE[charData.性格] ? charData.性格 : '认真';
+  const form = RULES.FORM_BONUS[charData.变化形态] ? charData.变化形态 : '无';
+  const level = parseSafeNumber(realLevel, 1);
+
+  const [baseBST, baseGPT] = RULES.QUALITY[quality];
+  const talentMod = RULES.TALENT[talent];
+  const distribution = RULES.COMBAT_TYPE[type];
+
+  const totalPoints = Math.floor((baseBST + (baseGPT * (level - 1))) * talentMod) || 200;
+  let rawStats = distribution.map(pct => Math.floor(totalPoints * pct));
+
+  const natureMod = RULES.NATURE[nature];
+  const [upIdx, downIdx] = natureMod;
+  if (upIdx !== null && rawStats[upIdx]) rawStats[upIdx] = Math.floor(rawStats[upIdx] * 1.1);
+  if (downIdx !== null && rawStats[downIdx]) rawStats[downIdx] = Math.floor(rawStats[downIdx] * 0.9);
+
+  let [bATK, bDEF, bSpA, bSpD, bSPD] = rawStats;
+
+  const formBonus = RULES.FORM_BONUS[form];
+  bATK = Math.floor(bATK * (1 + formBonus.atk));
+  bDEF = Math.floor(bDEF * (1 + formBonus.def));
+  bSpA = Math.floor(bSpA * (1 + formBonus.spA));
+  bSpD = Math.floor(bSpD * (1 + formBonus.spD));
+  bSPD = Math.floor(bSPD * (1 + formBonus.spd));
+
+  return {
+    攻击力: (Math.floor(bATK / 2) + 10) || 10,
+    防御力: (Math.floor(bDEF / 2) + 10) || 10,
+    特攻: (Math.floor(bSpA / 2) + 10) || 10,
+    特防: (Math.floor(bSpD / 2) + 10) || 10,
+    速度: (Math.floor(bSPD / 2) + 10) || 10,
+    HP最大值: ((bDEF + bSpD) * 2 + 60) || 100,
+    MP最大值: (Math.floor((bSpA + bSpD) * 1.5 + 40)) || 50
+  };
+}
+
+// ====================================================================
+// 3. Schema 定义
+// ====================================================================
+
+
+
+const safeEnum = (values, defaultValue) => z.enum(values).catch(defaultValue).prefault(defaultValue);
+
+const SkillSchema = z.object({
+  类型: safeEnum(['主动', '被动', '光环', '天赋'], '主动'),
+  稀有度: safeEnum(['普通', '稀有', '史诗', '传说', '神话'], '普通'),
+  元素属性: safeEnum(['地', '火', '水', '风', '光', '暗', '无'], '无'),
+  消耗MP: z.coerce.number().prefault(0),
+  冷却回合: z.coerce.number().prefault(0),
+  基础威力: z.coerce.number().prefault(0),
+  描述: z.string().prefault(''),
+  效果公式: z.string().prefault(''),
+  数值参数: z.record(z.string(), z.coerce.number()).prefault({})
+});
+
+const TrainerSkillSchema = z.object({
+  类型: safeEnum(['主动', '被动'], '被动'),
+  稀有度: safeEnum(['普通', '稀有', '史诗', '传说', '神话'], '稀有'),
+  获取途径: z.string().prefault(''),
+  解锁条件: z.string().prefault(''),
+  已解锁: z.boolean().prefault(false),
+  冷却回合: z.coerce.number().prefault(0),
+  使用次数: z.coerce.number().prefault(-1),
+  描述: z.string().prefault(''),
+  效果: z.string().prefault(''),
+  效果公式: z.string().prefault(''),
+  数值参数: z.record(z.string(), z.coerce.number()).prefault({})
+});
+
+const TrainerEquipmentSchema = z.object({
+  名称: z.string().prefault(''),
+  稀有度: safeEnum(['普通', '稀有', '史诗', '传说', '神话'], '普通'),
+  获取途径: z.string().prefault(''),
+  描述: z.string().prefault(''),
+  效果: z.string().prefault(''),
+  效果公式: z.string().prefault(''),
+  数值参数: z.record(z.string(), z.coerce.number()).prefault({})
+});
+
+const CollectionRoomSchema = z.object({
+  已解锁: z.boolean().prefault(false),
+  解锁条件: z.string().prefault('据点解锁后自动解锁'),
+  等级: z.coerce.number().transform(v => _.clamp(v, 1, 5)).prefault(1),
+  容量上限: z.coerce.number().prefault(5),
+  当前效果: z.string().prefault(''),
+  每日好感加成: z.coerce.number().prefault(0),
+  升级费用: z.coerce.number().prefault(0),
+  当前使用: z.array(z.string()).prefault([])
+}).prefault({});
+
+const WorkAreaSchema = z.object({
+  已解锁: z.boolean().prefault(false),
+  解锁条件: z.string().prefault(''),
+  解锁方式: safeEnum(['等级', '任务', '金币', '特殊'], '等级'),
+  解锁需求值: z.coerce.number().prefault(0),
+  等级: z.coerce.number().transform(v => _.clamp(v, 1, 5)).prefault(1),
+  名称: z.string().prefault(''),
+  当前效果: z.string().prefault(''),
+  效果数值: z.coerce.number().prefault(0),
+  升级费用: z.coerce.number().prefault(0),
+  当前使用: z.array(z.string()).prefault([]),
+  容量上限: z.coerce.number().prefault(3)
+}).prefault({});
+
+const BaseSystemSchema = z.object({
+  已解锁: z.boolean().prefault(false),
+  解锁条件: z.string().prefault('训练家等级达到Lv.5'),
+  收藏室: CollectionRoomSchema,
+  工作区: WorkAreaSchema
+}).prefault({});
+
+const TrainerSchema = z.object({
+  身份: z.string().prefault(''),
+  等级: z.coerce.number().prefault(1),
+  经验值: z.object({
+    当前值: z.coerce.number().prefault(0),
+    升级所需值: z.coerce.number().prefault(100)
+  }).prefault({}),
+  技能: z.record(z.string(), TrainerSkillSchema).prefault({}),
+  特殊装备: z.array(TrainerEquipmentSchema)
+    .transform(items => items.slice(-3))
+    .prefault([]),
+  据点: BaseSystemSchema
+}).prefault({});
+
+const TaskSchema = z.object({
+  名称: z.string().prefault(''),
+  要求: z.string().prefault(''),
+  奖励: z.string().prefault(''),
+  类型: safeEnum(['日常任务', '周常任务', '剧情任务', '限时任务'], '日常任务'),
+  期限: z.string().prefault(''),
+  已完成: z.boolean().prefault(false),
+  已过期: z.boolean().prefault(false),
+  进度: z.string().prefault(''),
+  标签: z.array(z.string()).prefault([]),
+  优先级: safeEnum(['低', '中', '高', '紧急'], '中'),
+  图标: z.string().prefault(''),
+  发布者: z.string().prefault('系统'),
+  背景色: z.string().prefault('')
+});
+
+const ProfileSchema = z.object({
+  原身份: z.string().prefault(''),
+  捕获经过: z.string().prefault(''),
+  过往经历: z.string().prefault(''),
+  与训练家关系: z.string().prefault(''),
+  喜好体位: z.string().prefault(''),
+  性癖: z.string().prefault(''),
+  性格特征: z.string().prefault('')
+}).prefault({});
+
+const SexualStateSchema = z.object({
+  胸部: z.object({
+    尺寸: z.string().prefault(''),
+    乳头状态: z.string().prefault('粉嫩'),
+    开发度: z.coerce.number().transform(v => _.clamp(v, 0, 100)).prefault(0),
+    敏感度: safeEnum(['迟钝', '普通', '敏感', '过敏', '淫乱'], '普通'),
+    当前状态: z.string().prefault('正常'),
+    特殊标记: z.string().prefault('')
+  }).prefault({}),
+  阴部: z.object({
+    处女膜: safeEnum(['完整', '已破', '无'], '完整'),
+    紧致度: safeEnum(['紧致', '普通', '松弛', '松垮'], '紧致'),
+    开发度: z.coerce.number().transform(v => _.clamp(v, 0, 100)).prefault(0),
+    敏感度: safeEnum(['迟钝', '普通', '敏感', '过敏', '淫乱'], '普通'),
+    当前状态: z.string().prefault('正常'),
+    特殊标记: z.string().prefault('')
+  }).prefault({}),
+  阴蒂: z.object({
+    大小: safeEnum(['隐藏', '小巧', '普通', '突出', '肥大'], '小巧'),
+    开发度: z.coerce.number().transform(v => _.clamp(v, 0, 100)).prefault(0),
+    敏感度: safeEnum(['迟钝', '普通', '敏感', '过敏', '淫乱'], '普通'),
+    当前状态: z.string().prefault('正常'),
+    特殊标记: z.string().prefault('')
+  }).prefault({}),
+  后庭: z.object({
+    开发度: z.coerce.number().transform(v => _.clamp(v, 0, 100)).prefault(0),
+    紧致度: safeEnum(['紧闭', '紧致', '普通', '松弛'], '紧闭'),
+    敏感度: safeEnum(['迟钝', '普通', '敏感', '过敏', '淫乱'], '迟钝'),
+    当前状态: z.string().prefault('正常'),
+    特殊标记: z.string().prefault('')
+  }).prefault({}),
+  子宫: z.object({
+    状态: safeEnum(['未开发', '轻度开发', '中度开发', '完全开发', '子宫脱垂'], '未开发'),
+    敏感度: safeEnum(['迟钝', '普通', '敏感', '过敏', '淫乱'], '迟钝'),
+    当前状态: z.string().prefault('正常'),
+    特殊标记: z.string().prefault('')
+  }).prefault({}),
+  口腔: z.object({
+    技巧: safeEnum(['生疏', '普通', '熟练', '精通', '大师'], '生疏'),
+    开发度: z.coerce.number().transform(v => _.clamp(v, 0, 100)).prefault(0),
+    敏感度: safeEnum(['迟钝', '普通', '敏感', '过敏'], '普通'),
+    深喉适应: safeEnum(['无法接受', '勉强', '适应', '精通'], '无法接受'),
+    当前状态: z.string().prefault('正常'),
+    特殊标记: z.string().prefault('')
+  }).prefault({}),
+  整体淫乱度: z.coerce.number().transform(v => _.clamp(v, 0, 100)).prefault(0),
+  性经验次数: z.coerce.number().prefault(0),
+  高潮体质: safeEnum(['难以高潮', '普通', '容易高潮', '连续高潮体质', '潮吹体质'], '普通'),
+  当前性欲: z.coerce.number().transform(v => _.clamp(v, 0, 100)).prefault(0)
+}).prefault({});
+
+const SingleCharacterSchema = z.object({
+  状态: safeEnum(['正常', '濒死', '死亡', '异常'], '正常'),
+  从属训练家: z.string().prefault(''),
+  归属状态: safeEnum(['出战', '已储存', '离场'], '出战'),
+  个人资料: ProfileSchema,
+  等级: z.coerce.number().prefault(1),
+  品质: safeEnum(['E', 'D', 'C', 'B', 'A', 'S'], 'E'),
+  资质: safeEnum(['天才', '优秀', '普通', '平庸'], '普通'),
+  性格: safeEnum([
+    '固执', '孤僻', '勇敢', '调皮', '内敛', '稳重', '冷静', '马虎',
+    '胆小', '急躁', '开朗', '天真', '大胆', '悠闲', '淘气',
+    '温和', '自大', '慎重', '坦率', '认真', '害羞'
+  ], '认真'),
+  战斗类型: safeEnum(['均衡型', '强攻型', '重盾型', '魔导型', '敏捷型'], '均衡型'),
+  元素属性: safeEnum(['地', '火', '水', '风', '光', '暗'], '地'),
+  好感度: z.coerce.number().transform(v => _.clamp(v, -100, 200)).prefault(0),
+  堕落值: z.coerce.number().transform(v => _.clamp(v, 0, 100)).prefault(0),
+  当前想法: z.string().prefault(''),
+  已触发事件: z.record(z.string(), z.boolean()).prefault({}),
+  生命值: z.object({
+    当前值: z.coerce.number().prefault(0),
+    最大值: z.coerce.number().prefault(0)
+  }).prefault({}),
+  法力值: z.object({
+    当前值: z.coerce.number().prefault(0),
+    最大值: z.coerce.number().prefault(0)
+  }).prefault({}),
+  经验值: z.object({
+    当前值: z.coerce.number().prefault(0),
+    升级所需值: z.coerce.number().prefault(100)
+  }).prefault({}),
+  攻击力: z.coerce.number().prefault(0),
+  防御力: z.coerce.number().prefault(0),
+  特攻: z.coerce.number().prefault(0),
+  特防: z.coerce.number().prefault(0),
+  速度: z.coerce.number().prefault(0),
+  变化形态: safeEnum(['无', '天使化', '恶魔化', '精灵化', '兽人化'], '无'),
+  技能: z.record(z.string(), SkillSchema).prefault({}),
+  着装: z.object({
+    上装: z.string().prefault(''),
+    下装: z.string().prefault(''),
+    内衣: z.string().prefault(''),
+    鞋袜: z.string().prefault(''),
+    饰品: z.string().prefault('')
+  }).prefault({}),
+  战斗衣着: z.string().prefault(''),
+  性器状态: SexualStateSchema
+});
+
+const AUTO_EVENTS = [
+  { id: '特殊事件_喜欢', condition: (char) => char.好感度 >= 100 && !char.已触发事件['特殊事件_喜欢'] },
+  { id: '特殊事件_初次亲吻', condition: (char) => char.好感度 >= 105 && !char.已触发事件['特殊事件_初次亲吻'] },
+  { id: '特殊事件_深情告白', condition: (char) => char.好感度 >= 110 && char.已触发事件['特殊事件_喜欢'] && !char.已触发事件['特殊事件_深情告白'] },
+  { id: '特殊事件_形态觉醒', condition: (char) => char.好感度 >= 150 && !char.已触发事件['特殊事件_形态觉醒'] },
+  { id: '特殊事件_羁绊技能', condition: (char) => char.好感度 >= 200 && !char.已触发事件['特殊事件_羁绊技能'] }
+];
+
+// ====================================================================
+// 4. 主 Schema
+// ====================================================================
+
+export const Schema = z.object({
+  current_target: z.string().prefault(''),
+  current_event: z.string().prefault(''),
+  玩家名: z.string().prefault('lin'),
+  世界: z.object({
+    时间: z.string().prefault('08:00'),
+    日期: z.string().prefault('2022年5月8日'),
+    星期: safeEnum(['周一', '周二', '周三', '周四', '周五', '周六', '周日'], '周日'),
+    地点: z.string().prefault('初始城镇'),
+    天气: z.string().prefault('晴'),
+    近期事务: z.string().prefault('无'),
+    _上次结算日期: z.string().prefault('2022年5月8日'),
+    _任务上次刷新日期: z.string().prefault('')
+  }).prefault({}),
+  金币: z.coerce.number().prefault(0),
+  训练家: TrainerSchema,
+  收藏室: z.array(z.string()).prefault([]),
+
+  背包: z.record(z.string(), z.object({
+    描述: z.string().prefault(''),
+    数量: z.coerce.number().prefault(1)
+  })).transform(items => _.pickBy(items, i => i.数量 > 0)).prefault({}),
+  任务列表: z.record(z.string(), TaskSchema)
+    .transform(tasks => {
+      return _.pickBy(tasks, (task, taskId) => {
+        if (task.已完成 || task.已过期) return false;
+        if (!task.名称 || task.名称.trim() === '') return false;
+        if (!taskId || taskId.trim() === '') return false;
+        return true;
+      });
+    })
+    .prefault({}),
+  _任务奖励映射: z.record(z.string(), z.any()).prefault({}),
+  角色数据: z.record(z.string(), SingleCharacterSchema).prefault({}),
+  战斗控制台: z.object({
+    进行中: z.boolean().prefault(false),
+    己方出战: z.string().prefault(''),
+    敌方出战: z.string().prefault(''),
+    己方队伍: z.array(z.string()).prefault([]),
+    敌方队伍: z.array(z.string()).prefault([]),
+    战斗类型: safeEnum(['普通', '捕获', 'BOSS'], '普通'),
+    敌方训练家信息: z.object({
+      类型: z.string().prefault('未知'),
+      意志状态: z.string().prefault('未知'),
+      持有捕捉球: z.boolean().prefault(true),
+      捕捉球类型: z.string().prefault('普通球')
+    }).prefault({})
+  }).prefault({})
+})
+.transform((data) => {
+  const RULES = getRules();
+
+  // ====== 训练家计算 ======
+  if (data.训练家) {
+    const trainer = data.训练家;
+    const safeTrainerExp = trainer.经验值 ? parseSafeNumber(trainer.经验值.当前值, 0) : 0;
+    const trainerLevelInfo = calculateLevelFromExp(safeTrainerExp);
+    trainer.等级 = trainerLevelInfo.level;
+    trainer.经验值.升级所需值 = trainerLevelInfo.maxExp;
+
+    if (trainer.等级 >= 5 && !trainer.据点.已解锁) {
+      trainer.据点.已解锁 = true;
+      // 据点解锁后自动解锁收藏室
+      trainer.据点.收藏室.已解锁 = true;
+    }
+
+    // 收藏室计算
+    if (trainer.据点.已解锁 && trainer.据点.收藏室.已解锁) {
+      const collectionRoom = trainer.据点.收藏室;
+      if (collectionRoom.等级 > 0) {
+        const capacity = RULES.COLLECTION_CAPACITY[collectionRoom.等级] || 5;
+        const affectionBonus = RULES.COLLECTION_AFFECTION_BONUS[collectionRoom.等级] || 0;
+
+        collectionRoom.容量上限 = capacity;
+        collectionRoom.每日好感加成 = affectionBonus;
+        collectionRoom.当前效果 = `容量: ${capacity}人，每日恢复30%HP/MP，每日好感度+${affectionBonus}`;
+
+        // 计算升级费用
+        const upgradeCosts = { 0: 0, 1: 1000, 2: 3000, 3: 8000, 4: 20000, 5: 0 };
+        collectionRoom.升级费用 = upgradeCosts[collectionRoom.等级] || 0;
+      }
+    }
+
+    // 工作区计算
+    if (trainer.据点.已解锁 && trainer.据点.工作区.已解锁) {
+      const workArea = trainer.据点.工作区;
+      if (workArea.等级 > 0) {
+        const areaName = RULES.WORK_AREA_NAMES[workArea.等级] || '咖啡厅';
+        const capacity = RULES.WORK_AREA_CAPACITY[workArea.等级] || 3;
+        const income = RULES.WORK_AREA_INCOME[workArea.等级] || 50;
+
+        workArea.名称 = areaName;
+        workArea.容量上限 = capacity;
+        workArea.效果数值 = income;
+        workArea.当前效果 = `${areaName}，容量: ${capacity}人，金币产出${income}/天/人`;
+
+        // 计算升级费用
+        const upgradeCosts = { 0: 0, 1: 1000, 2: 3000, 3: 8000, 4: 20000, 5: 0 };
+        workArea.升级费用 = upgradeCosts[workArea.等级] || 0;
+      }
+    }
+  }
+
+  // ====== 日常结算检测 ======
+  const currentDate = data.世界.日期;
+  const lastSettlementDate = data.世界._上次结算日期 || currentDate;
+
+  if (currentDate !== lastSettlementDate) {
+    console.log(`[日常结算] 检测到日期变化: ${lastSettlementDate} → ${currentDate}`);
+
+    // ====== 收藏室结算 ======
+    if (data.训练家.据点.已解锁 && data.训练家.据点.收藏室.已解锁) {
+      const collectionRoom = data.训练家.据点.收藏室;
+      if (collectionRoom.等级 > 0 && collectionRoom.当前使用.length > 0) {
+        const affectionBonus = RULES.COLLECTION_AFFECTION_BONUS[collectionRoom.等级] || 0;
+
+        for (const senkiName of collectionRoom.当前使用) {
+          if (data.角色数据[senkiName]) {
+            const char = data.角色数据[senkiName];
+            const oldAffection = char.好感度;
+            char.好感度 = _.clamp(oldAffection + affectionBonus, -100, 200);
+            console.log(`  [收藏室] ${senkiName} 好感度 +${affectionBonus} (${oldAffection} → ${char.好感度})`);
+
+            // 恢复30%HP/MP
+            const hpRecover = Math.floor(char.生命值.最大值 * 0.3);
+            const mpRecover = Math.floor(char.法力值.最大值 * 0.3);
+            char.生命值.当前值 = _.clamp(char.生命值.当前值 + hpRecover, 0, char.生命值.最大值);
+            char.法力值.当前值 = _.clamp(char.法力值.当前值 + mpRecover, 0, char.法力值.最大值);
+            console.log(`  [收藏室] ${senkiName} HP恢复 +${hpRecover}, MP恢复 +${mpRecover}`);
+          }
+        }
+      }
+    }
+
+    // ====== 工作区结算 ======
+    if (data.训练家.据点.已解锁 && data.训练家.据点.工作区.已解锁) {
+      const workArea = data.训练家.据点.工作区;
+      if (workArea.等级 > 0 && workArea.当前使用.length > 0) {
+        const incomePerPerson = workArea.效果数值 || RULES.WORK_AREA_INCOME[workArea.等级] || 0;
+        const totalIncome = incomePerPerson * workArea.当前使用.length;
+
+        data.金币 += totalIncome;
+        console.log(`  [工作区] 产出金币 +${totalIncome} (${incomePerPerson}/人 × ${workArea.当前使用.length}人)`);
+      }
+    }
+
+    // ====== 更新结算日期 ======
+    data.世界._上次结算日期 = currentDate;
+    console.log(`[日常结算] 完成，更新结算日期为 ${currentDate}`);
+  }
+
+  // ====== 收藏室列表自动维护 ======
+  const 储存列表 = [];
+  for (const name in data.角色数据) {
+    const char = data.角色数据[name];
+    if (char.从属训练家 === data.玩家名 || char.从属训练家 === '') {
+      if (char.归属状态 === '已储存') {
+        储存列表.push(name);
+      }
+    }
+  }
+  data.收藏室 = 储存列表;
+
+  // ====== 自动事件 ======
+  if (data.current_target && !data.current_event) {
+    const char = data.角色数据[data.current_target];
+    if (char) {
+      for (const event of AUTO_EVENTS) {
+        if (event.condition(char)) {
+          data.current_event = event.id;
+          break;
+        }
+      }
+    }
+  }
+
+  if (data.current_target && data.current_event) {
+    if (data.角色数据[data.current_target]) {
+      data.角色数据[data.current_target].已触发事件[data.current_event] = true;
+    }
+  }
+
+  // ====== 角色计算 ======
+  for (const name in data.角色数据) {
+    const char = data.角色数据[name];
+
+    // 变化形态元素限制
+    if (char.变化形态 !== '无') {
+      const allowedElements = RULES.FORM_ELEMENT_RESTRICTION[char.变化形态];
+      if (allowedElements && !allowedElements.includes(char.元素属性)) {
+        char.变化形态 = '无';
+      }
+    }
+
+    // 等级计算与经验值同步
+    const safeExp = char.经验值 ? parseSafeNumber(char.经验值.当前值, 0) : 0;
+    const levelInfo = calculateLevelFromExp(safeExp);
+    const newLevel = levelInfo.level;
+    const isLevelUp = newLevel > char.等级;
+
+    if (char.等级 > 1 && safeExp === 0) {
+      const minExp = calculateMinExpForLevel(char.等级);
+      char.经验值.当前值 = minExp;
+    } else {
+      char.等级 = newLevel;
+    }
+
+    char.经验值.升级所需值 = levelInfo.maxExp;
+
+    // 属性计算
+    const stats = calculateStats(char, char.等级);
+    char.攻击力 = stats.攻击力;
+    char.防御力 = stats.防御力;
+    char.特攻 = stats.特攻;
+    char.特防 = stats.特防;
+    char.速度 = stats.速度;
+    char.生命值.最大值 = stats.HP最大值;
+    char.法力值.最大值 = stats.MP最大值;
+
+    if (isLevelUp || char.生命值.当前值 <= 0) char.生命值.当前值 = stats.HP最大值;
+    if (isLevelUp || char.法力值.当前值 <= 0) char.法力值.当前值 = stats.MP最大值;
+
+    char.生命值.当前值 = _.clamp(char.生命值.当前值, 0, stats.HP最大值);
+    char.法力值.当前值 = _.clamp(char.法力值.当前值, 0, stats.MP最大值);
+
+    // 整体淫乱度计算
+    if (char.性器状态) {
+      const s = char.性器状态;
+      const weights = { 胸部: 0.15, 阴部: 0.30, 阴蒂: 0.15, 后庭: 0.20, 子宫: 0.10, 口腔: 0.10 };
+
+      let totalDev = 0;
+      totalDev += (s.胸部?.开发度 || 0) * weights.胸部;
+      totalDev += (s.阴部?.开发度 || 0) * weights.阴部;
+      totalDev += (s.阴蒂?.开发度 || 0) * weights.阴蒂;
+      totalDev += (s.后庭?.开发度 || 0) * weights.后庭;
+      totalDev += (s.口腔?.开发度 || 0) * weights.口腔;
+
+      const wombMap = { '未开发': 0, '轻度开发': 25, '中度开发': 50, '完全开发': 75, '子宫脱垂': 100 };
+      totalDev += (wombMap[s.子宫?.状态] || 0) * weights.子宫;
+
+      s.整体淫乱度 = Math.floor(_.clamp(totalDev, 0, 100));
+    }
+  }
+
+  return data;
+});
+
+// ====================================================================
+// 5. 注册
+// ====================================================================
+
+$(() => {
+  registerMvuSchema(Schema);
+});

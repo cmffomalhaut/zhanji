@@ -1,0 +1,2182 @@
+# 战姬状态栏 — 商店 + 自动任务系统
+# 编码: UTF-8
+# 从 YAML 提取 HTML: 去掉 html: | 那行，然后每行去掉前2个空格即可
+
+html: |
+  <!doctype html>
+  <html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+      * {
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+        background: transparent;
+        font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+        color: #eee;
+        font-size: 12px;
+      }
+  
+      #app {
+        width: 100%;
+        aspect-ratio: 9 / 12;
+        max-width: 100%;
+        display: flex;
+        flex-direction: column;
+        background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+        border-radius: 12px;
+        overflow: hidden;
+        border: 2px solid #0f3460;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      }
+      #app.collapsed {
+        aspect-ratio: auto;
+        height: 44px;
+      }
+      #app.collapsed .main-content,
+      #app.collapsed .bottom-nav {
+        display: none;
+      }
+  
+      .top-bar {
+        height: 40px;
+        background: linear-gradient(135deg, #0f3460 0%, #16213e 100%);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 6px;
+        border-bottom: 1px solid #0f3460;
+        flex-shrink: 0;
+      }
+      .top-left {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        flex: 1;
+        min-width: 0;
+      }
+      .top-info {
+        font-size: 13px;
+        color: #94a3b8;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: nowrap;
+        overflow: hidden;
+      }
+      .top-info span {
+        white-space: nowrap;
+      }
+      .gold-badge {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        color: #1a1a2e;
+        padding: 3px 8px;
+        border-radius: 10px;
+        font-weight: bold;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 3px;
+        flex-shrink: 0;
+      }
+      .top-btns {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+        flex-shrink: 0;
+      }
+      .top-btn {
+        background: rgba(255,255,255,0.1);
+        border: none;
+        color: #94a3b8;
+        font-size: 13px;
+        padding: 4px 6px;
+        border-radius: 6px;
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+      .top-btn:active {
+        background: rgba(255,255,255,0.2);
+      }
+      .top-btn.spinning {
+        animation: spin 0.5s ease-in-out;
+      }
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+  
+      .main-content {
+        flex: 1;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+  
+      .list-panel {
+        display: none;
+        flex-direction: column;
+        height: 100%;
+        min-height: 0;
+      }
+      .list-panel.active {
+        display: flex;
+      }
+      .list-header {
+        padding: 8px 12px;
+        font-size: 16px;
+        font-weight: bold;
+        color: #e0e7ff;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        flex-shrink: 0;
+      }
+      .list-scroll {
+        flex: 1;
+        overflow-y: auto;
+        padding: 6px;
+        min-height: 0;
+      }
+  
+      .category-header {
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(79, 70, 229, 0.1) 100%);
+        padding: 8px 12px;
+        border-radius: 8px;
+        font-size: 15px;
+        font-weight: bold;
+        color: #a5b4fc;
+        margin-bottom: 6px;
+        margin-top: 6px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+      }
+      .category-header:first-child {
+        margin-top: 0;
+      }
+      .category-header .toggle-icon {
+        font-size: 13px;
+        transition: transform 0.2s;
+      }
+      .category-header.collapsed .toggle-icon {
+        transform: rotate(-90deg);
+      }
+      .category-content {
+        overflow: hidden;
+      }
+      .category-content.collapsed {
+        display: none;
+      }
+  
+      .list-item {
+        background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.04) 100%);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 10px;
+        padding: 10px 12px;
+        margin-bottom: 6px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .list-item:active {
+        background: rgba(99, 102, 241, 0.3);
+        transform: scale(0.98);
+      }
+      .item-left {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        min-width: 0;
+        flex: 1;
+      }
+      .item-name {
+        font-size: 16px;
+        font-weight: bold;
+        color: #f1f5f9;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .item-sub {
+        font-size: 13px;
+        color: #94a3b8;
+      }
+      .item-identity {
+        font-size: 12px;
+        color: #f472b6;
+        font-style: italic;
+      }
+      .item-right {
+        font-size: 14px;
+        font-weight: bold;
+        color: #a5b4fc;
+        text-align: right;
+        flex-shrink: 0;
+      }
+      .list-empty {
+        text-align: center;
+        padding: 24px;
+        color: #64748b;
+        font-size: 15px;
+      }
+  
+      .location-tag {
+        font-size: 10px;
+        padding: 2px 4px;
+        border-radius: 4px;
+        font-weight: bold;
+      }
+      .loc-team { background: #22c55e; color: #052e16; }
+      .loc-stored { background: #3b82f6; color: white; }
+      .loc-facility { background: #f59e0b; color: #1a1a2e; }
+  
+      .quest-tag {
+        font-size: 9px;
+        padding: 2px 4px;
+        border-radius: 4px;
+        font-weight: bold;
+      }
+      .qt-daily { background: #22c55e; color: #052e16; }
+      .qt-weekly { background: #a855f7; color: white; }
+      .qt-story { background: #ef4444; color: white; }
+      .qt-limited { background: #f59e0b; color: #1a1a2e; }
+  
+      .detail-panel {
+        display: none;
+        flex-direction: column;
+        height: 100%;
+        min-height: 0;
+      }
+      .detail-panel.active {
+        display: flex;
+      }
+      .detail-header {
+        padding: 6px 10px;
+        background: linear-gradient(135deg, #0f3460 0%, #16213e 100%);
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+        flex-shrink: 0;
+      }
+      .detail-header-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .back-btn {
+        background: rgba(255,255,255,0.1);
+        border: none;
+        color: #94a3b8;
+        font-size: 12px;
+        padding: 3px 6px;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      .char-name {
+        font-size: 16px;
+        font-weight: bold;
+        color: #f1f5f9;
+        margin-top: 3px;
+      }
+      .char-identity {
+        font-size: 12px;
+        color: #f472b6;
+        font-style: italic;
+        margin-top: 2px;
+      }
+      .char-badge {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        color: white;
+        padding: 2px 5px;
+        border-radius: 5px;
+        font-size: 11px;
+        font-weight: bold;
+      }
+      .char-owner {
+        font-size: 11px;
+        color: #94a3b8;
+        margin-top: 3px;
+      }
+      .char-owner .owner-name {
+        color: #60a5fa;
+        font-weight: bold;
+      }
+      .detail-scroll {
+        flex: 1;
+        overflow-y: auto;
+        padding: 6px;
+        min-height: 0;
+      }
+  
+      .thought-box {
+        background: linear-gradient(135deg, rgba(251, 191, 36, 0.2) 0%, rgba(245, 158, 11, 0.1) 100%);
+        border: 1px dashed #f59e0b;
+        border-radius: 10px;
+        padding: 8px;
+        margin-bottom: 8px;
+        font-size: 14px;
+        font-style: italic;
+        color: #fcd34d;
+        line-height: 1.5;
+      }
+      .thought-box::before {
+        content: "💭 ";
+      }
+  
+      .bar-group {
+        background: rgba(255,255,255,0.05);
+        border-radius: 10px;
+        padding: 8px;
+        margin-bottom: 8px;
+      }
+      .bar-row {
+        display: flex;
+        align-items: center;
+        margin-bottom: 5px;
+      }
+  
+      .bar-row:last-child {
+        margin-bottom: 0;
+      }
+      .bar-icon {
+        width: 22px;
+        font-size: 15px;
+        text-align: center;
+      }
+      .bar-track {
+        flex: 1;
+        height: 12px;
+        background: rgba(0,0,0,0.3);
+        border-radius: 6px;
+        margin: 0 6px;
+        overflow: hidden;
+      }
+      .bar-fill {
+        height: 100%;
+        border-radius: 6px;
+        transition: width 0.3s;
+      }
+      .fill-hp { background: linear-gradient(90deg, #ef4444, #f87171);}
+      .fill-mp { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
+      .fill-exp { background: linear-gradient(90deg, #8b5cf6, #a78bfa); }
+      .fill-trainer { background: linear-gradient(90deg, #10b981, #34d399); }
+      .bar-text {
+        width: 65px;
+        font-size: 12px;
+        text-align: right;
+        font-family: monospace;
+        color: #94a3b8;
+      }
+  
+      .section {
+        margin-bottom: 6px;
+      }
+      .section-head {
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.3) 0%, rgba(79, 70, 229, 0.2) 100%);
+        padding: 8px 10px;
+        border-radius: 8px;
+        font-size: 15px;
+        font-weight: bold;
+        color: #e0e7ff;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+      }
+      .section-head .toggle-icon {
+        font-size: 12px;
+        transition: transform 0.2s;
+      }
+      .section-head.collapsed .toggle-icon {
+        transform: rotate(-90deg);
+      }
+      .section-body {
+        padding: 6px 3px;
+        overflow: hidden;
+      }
+      .section-body.collapsed {
+        display: none;
+      }
+  
+      .data-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 5px;
+      }
+      .data-cell {
+        background: rgba(255,255,255,0.05);
+        border-radius: 6px;
+        padding: 6px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .data-cell.full {
+        grid-column: 1 / -1;
+      }
+      .cell-label {
+        font-size:  12px;
+        color: #94a3b8;
+      }
+      .cell-value {
+        font-size: 14px;
+        font-weight: bold;
+        color: #f1f5f9;
+      }
+      .cell-value.love { color: #f87171; }
+      .cell-value.corr { color: #a78bfa; }
+  
+      .form-tag {
+        display: inline-block;
+        padding: 2px 5px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: bold;
+      }
+      .form-none { background: #475569; color: #94a3b8; }
+      .form-angel { background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #1a1a2e; }
+      .form-demon { background: linear-gradient(135deg, #a855f7, #7c3aed); color: white; }
+      .form-elf { background: linear-gradient(135deg, #22c55e, #16a34a); color: white; }
+      .form-beast { background: linear-gradient(135deg, #f97316, #ea580c); color: white; }
+  
+      .profile-item {
+        background: rgba(255,255,255,0.05);
+        border-radius: 6px;
+        padding: 6px 8px;
+        margin-bottom: 4px;
+        font-size: 13px;
+        line-height: 1.4;
+      }
+      .profile-item .p-label {
+        color: #94a3b8;
+        font-weight: bold;
+      }
+      .profile-item .p-value {
+        color: #e2e8f0;
+      }
+      .profile-item.highlight {
+        background: linear-gradient(135deg, rgba(236, 72, 153, 0.2) 0%, rgba(219, 39, 119, 0.1) 100%);
+        border: 1px solid rgba(236, 72, 153, 0.3);
+      }
+  
+      .skill-card {
+        background: rgba(255,255,255,0.05);
+        border-left: 4px solid #6366f1;
+        border-radius: 0 8px 8px 0;
+        padding: 8px;
+        margin-bottom: 5px;
+      }
+      .skill-card.trainer-skill {
+        border-left-color: #10b981;
+      }
+      .skill-card.locked {
+        opacity: 0.5;
+        border-left-color: #64748b;
+      }
+      .skill-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 4px;
+        flex-wrap: wrap;
+        gap: 3px;
+      }
+      .skill-name {
+        font-size: 15px;
+        font-weight: bold;
+        color: #f1f5f9;
+        display: flex;
+        align-items: center;
+        gap: 3px;
+        flex-wrap: wrap;
+      }
+      .skill-meta {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .skill-type-tag {
+        font-size: 11px;
+        padding: 2px 4px;
+        border-radius: 4px;
+        font-weight: bold;
+      }
+      .stt-active { background: #3b82f6; color: white; }
+      .stt-passive { background: #22c55e; color: white; }
+      .stt-aura { background: #a855f7; color: white; }
+      .stt-talent { background: #f97316; color: white; }
+      .skill-rarity {
+        font-size: 11px;
+        padding: 2px 4px;
+        border-radius: 4px;
+      }
+      .sr-normal { background: #64748b; color: white; }
+      .sr-rare { background: #3b82f6; color: white; }
+      .sr-epic { background: #a855f7; color: white; }
+      .sr-legend { background: #f59e0b; color: #1a1a2e; }
+      .sr-myth { background: linear-gradient(135deg, #ef4444, #dc2626); color: white; }
+      .skill-mp {
+        font-size: 12px;
+        color: #60a5fa;
+        font-weight: bold;
+      }
+      .skill-cd {
+        font-size: 10px;
+        color: #f59e0b;
+        font-weight: bold;
+      }
+      .skill-desc {
+        font-size: 11px;
+        color: #94a3b8;
+        line-height: 1.4;
+      }
+      .skill-formula {
+        font-size: 10px;
+        color: #c4b5fd;
+        margin-top: 4px;
+        padding: 4px 5px;
+        background: rgba(139, 92, 246, 0.15);
+        border-radius: 5px;
+        font-family: monospace;
+      }
+      .skill-unlock {
+        font-size: 10px;
+        color: #ef4444;
+        margin-top: 4px;
+        padding: 3px 5px;
+        background: rgba(239, 68, 68, 0.15);
+        border-radius: 5px;
+      }
+  
+      .equip-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 0;
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+        font-size: 12px;
+      }
+      .equip-item:last-child {
+        border-bottom: none;
+      }
+      .equip-icon {
+        font-size: 14px;
+      }
+      .equip-name {
+        color: #e2e8f0;
+      }
+  
+      .special-item-card {
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(124, 58, 237, 0.1) 100%);
+        border: 1px solid rgba(139, 92, 246, 0.3);
+        border-radius: 10px;
+        padding: 10px;
+        margin-bottom: 8px;
+      }
+      .special-item-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 5px;
+      }
+      .special-item-name {
+        font-size: 13px;
+        font-weight: bold;
+        color: #c4b5fd;
+      }
+      .special-item-effect {
+        font-size: 13px;
+        color: #a5b4fc;
+        line-height: 1.4;
+      }
+  
+      .facility-card {
+        background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.04) 100%);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 10px;
+        padding: 10px;
+        margin-bottom: 6px;
+      }
+      .facility-card.locked {
+        opacity: 0.6;
+        border-style: dashed;
+      }
+      .facility-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 5px;
+      }
+      .facility-name {
+        font-size: 15px;
+        font-weight: bold;
+        color: #f1f5f9;
+      }
+      .facility-level {
+        font-size: 13px;
+        padding: 2px 5px;
+        border-radius: 5px;
+        font-weight: bold;
+      }
+      .fl-0 { background: #64748b; color: white; }
+      .fl-1 { background: #22c55e; color: white; }
+      .fl-2 { background: #3b82f6; color: white; }
+      .fl-3 { background: #a855f7; color: white; }
+      .fl-4 { background: #f59e0b; color: #1a1a2e; }
+      .fl-5 { background: linear-gradient(135deg, #ef4444, #dc2626); color: white; }
+      .facility-effect {
+        font-size: 13px;
+        color: #34d399;
+        margin-bottom: 5px;
+      }
+      .facility-capacity {
+        font-size: 12px;
+        color: #94a3b8;
+        margin-bottom: 5px;
+      }
+      .facility-users {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 3px;
+      }
+      .facility-user {
+        font-size: 11px;
+        padding: 2px 5px;
+        background: rgba(99, 102, 241, 0.3);
+        border-radius: 4px;
+        color: #e0e7ff;
+      }
+      .facility-unlock {
+        font-size: 10px;
+        color: #f59e0b;
+        margin-top: 4px;
+      }
+  
+      .collection-cabinet {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(37, 99, 235, 0.08) 100%);
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        border-radius: 10px;
+        padding: 10px;
+        margin-bottom: 6px;
+      }
+      .collection-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 5px;
+      }
+      .collection-name {
+        font-size: 15px;
+        font-weight: bold;
+        color: #60a5fa;
+      }
+      .collection-level {
+        font-size: 13px;
+        padding: 2px 5px;
+        border-radius: 5px;
+        font-weight: bold;
+      }
+      .collection-effect {
+        font-size: 13px;
+        color: #34d399;
+        margin-bottom: 5px;
+      }
+      .collection-capacity {
+        font-size: 12px;
+        color: #94a3b8;
+        margin-bottom: 8px;
+      }
+      .collection-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 5px;
+      }
+      .collection-slot {
+        background: rgba(0,0,0,0.2);
+        border: 1px solid rgba(59, 130, 246, 0.2);
+        border-radius: 8px;
+        padding: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .collection-slot:active {
+        background: rgba(59, 130, 246, 0.3);
+        transform: scale(0.98);
+      }
+      .collection-slot .slot-name {
+        font-size: 12px;
+        font-weight: bold;
+        color: #e0e7ff;
+        margin-bottom: 3px;
+      }
+      .collection-slot .slot-info {
+        font-size: 10px;
+        color: #94a3b8;
+      }
+  
+      .overall-card {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        border-radius: 10px;
+        padding: 10px;
+        margin-bottom: 8px;
+      }
+      .overall-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 4px;
+        font-size: 11px;
+      }
+      .overall-row:last-child {
+        margin-bottom: 0;
+      }
+      .overall-label {
+        color: rgba(255,255,255,0.8);
+      }
+      .overall-value {
+        font-weight: bold;
+        color: white;
+      }
+  
+      .organ-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 5px;
+      }
+      .organ-card {
+        background: linear-gradient(135deg, rgba(236, 72, 153, 0.15) 0%, rgba(219, 39, 119, 0.08) 100%);
+        border: 1px solid rgba(236, 72, 153, 0.2);
+        border-radius: 8px;
+        padding: 6px;
+      }
+      .organ-card.full {
+        grid-column: 1 / -1;
+      }
+      .organ-title {
+        font-size: 12px;
+        font-weight: bold;
+        color: #f472b6;
+        margin-bottom: 4px;
+      }
+      .organ-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 3px;
+        font-size: 12px;
+      }
+      .organ-label {
+        color: #94a3b8;
+      }
+      .organ-value {
+        color: #e2e8f0;
+        font-weight: bold;
+      }
+      .organ-state {
+        background: rgba(236, 72, 153, 0.2);
+        padding: 5px 6px;
+        border-radius: 6px;
+        font-size: 12px;
+        color: #f9a8d4;
+        margin-top: 5px;
+        line-height: 1.4;
+        border: 1px solid rgba(236, 72, 153, 0.3);
+        font-style: italic;
+        max-height: 80px;
+        overflow-y: auto;
+      }
+      .dev-bar {
+        height: 5px;
+        background: rgba(0,0,0,0.3);
+        border-radius: 3px;
+        overflow: hidden;
+        margin-top: 4px;
+      }
+      .dev-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #f472b6, #ec4899);
+        border-radius: 3px;
+      }
+      .sens-tag {
+        font-size: 9px;
+        padding: 2px 3px;
+        border-radius: 3px;
+        font-weight: bold;
+      }
+      .sens-dull { background: #64748b; color: white; }
+      .sens-normal { background: #3b82f6; color: white; }
+      .sens-sensitive { background: #ef4444; color: white; }
+      .sens-hyper { background: #a855f7; color: white; }
+      .sens-lewd { background: linear-gradient(135deg, #ec4899, #db2777); color: white; }
+  
+      .info-card {
+        background: rgba(255,255,255,0.05);
+        border-radius: 10px;
+        padding: 12px;
+      }
+      .info-row {
+        display: flex;
+        align-items: flex-start;
+        margin-bottom: 8px;
+        font-size: 12px;
+      }
+      .info-row:last-child {
+        margin-bottom: 0;
+      }
+      .info-label {
+        color: #94a3b8;
+        width: 50px;
+        flex-shrink: 0;
+        font-weight: bold;
+      }
+      .info-value {
+        color: #e2e8f0;
+        flex: 1;
+      }
+      .info-value.reward {
+        color: #fbbf24;
+        font-weight: bold;
+      }
+      .quest-status {
+        display: inline-block;
+        padding: 3px 6px;
+        border-radius: 5px;
+        font-size: 13px;
+        font-weight: bold;
+        margin-bottom: 8px;
+      }
+      .qs-done { background: #22c55e; color: white; }
+      .qs-progress { background: #f59e0b; color: #1a1a2e; }
+  
+      .lock-notice {
+        background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(220, 38, 38, 0.1) 100%);
+        border: 1px dashed #ef4444;
+        border-radius: 10px;
+        padding: 16px;
+        text-align: center;
+        margin-bottom:  8px;
+      }
+      .lock-icon {
+        font-size: 28px;
+        margin-bottom: 8px;
+      }
+      .lock-text {
+        font-size: 16px;
+        color: #fca5a5;
+        font-weight: bold;
+        margin-bottom: 4px;
+      }
+      .lock-sub {
+        font-size: 13px;
+        color: #94a3b8;
+      }
+  
+      .bottom-nav {
+        height: 60px;
+        background: linear-gradient(180deg, #0f3460 0%, #16213e 100%);
+        border-top: 1px solid rgba(255,255,255,0.1);
+        display: flex;
+        justify-content: space-evenly;
+        align-items: center;
+        flex-shrink: 0;
+        padding: 0;
+      }
+      .nav-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        padding: 3px 5px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+        min-width: 56px;
+        flex: 1;
+        max-width: 70px;
+      }
+      .nav-item:active {
+        transform: scale(0.95);
+      }
+      .nav-item.active {
+        background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+      }
+      .nav-icon {
+        font-size: 22px;
+      }
+      .nav-text {
+        font-size: 11px;
+        color: #94a3b8;
+        white-space: nowrap;
+      }
+      .nav-item.active .nav-text {
+        color: white;
+      }
+  
+      ::-webkit-scrollbar {
+        width: 4px;
+      }
+      ::-webkit-scrollbar-track {
+        background: rgba(255,255,255,0.05);
+        border-radius: 2px;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: rgba(99, 102, 241, 0.5);
+        border-radius: 2px;
+      }
+  
+      .shop-buy-btn {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        border: none;
+        color: #1a1a2e;
+        font-size: 13px;
+        font-weight: bold;
+        padding: 5px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+      .shop-buy-btn:active {
+        transform: scale(0.95);
+        opacity: 0.8;
+      }
+      .shop-buy-btn.limited {
+        background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+        color: white;
+      }
+      .shop-item-price {
+        font-size: 14px;
+        font-weight: bold;
+        color: #fbbf24;
+      }
+  
+      .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.7);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+      }
+      .modal-overlay.show {
+        display: flex;
+      }
+      .modal-box {
+        background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+        border: 2px solid #6366f1;
+        border-radius: 16px;
+        padding: 20px;
+        width: 85%;
+        max-width: 320px;
+        text-align: center;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      }
+      .modal-title {
+        font-size: 18px;
+        font-weight: bold;
+        color: #f1f5f9;
+        margin-bottom: 8px;
+      }
+      .modal-desc {
+        font-size: 13px;
+        color: #94a3b8;
+        margin-bottom: 10px;
+        line-height: 1.5;
+      }
+      .modal-price {
+        font-size: 20px;
+        font-weight: bold;
+        color: #fbbf24;
+        margin-bottom: 16px;
+      }
+      .modal-price .insufficient {
+        color: #ef4444;
+      }
+      .modal-btns {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+      }
+      .modal-btn {
+        padding: 10px 24px;
+        border-radius: 10px;
+        font-size: 15px;
+        font-weight: bold;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .modal-btn:active {
+        transform: scale(0.95);
+      }
+      .modal-btn.confirm {
+        background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+        color: white;
+      }
+      .modal-btn.confirm:disabled {
+        background: #475569;
+        color: #94a3b8;
+        cursor: not-allowed;
+      }
+      .modal-btn.cancel {
+        background: rgba(255,255,255,0.1);
+        color: #94a3b8;
+      }
+    </style>
+  
+    <script type="module">
+      let currentData = {};
+      let selectedCharName = null;
+      let currentView = 'list';
+      let currentTab = 'chars';
+      let collapsedCategories = {};
+      let collapsedSections = {};
+      let pendingPurchase = null;
+  
+      const SHOP_ITEMS = [
+        { category:'捕捉类', name:'普通捕捉球', desc:'捕捉E/D级战姬', price:100 },
+        { category:'捕捉类', name:'高级捕捉球', desc:'捕捉C级以下战姬', price:500 },
+        { category:'捕捉类', name:'超级捕捉球', desc:'B级以下高成功率，A级低成功率', price:5000, limit:'每周限购1' },
+        { category:'捕捉类', name:'魅惑之球', desc:'大幅降低抵抗意志，对任何品质有效', price:20000, limit:'极稀有' },
+        { category:'战斗类', name:'初级伤药', desc:'恢复20%HP', price:50 },
+        { category:'战斗类', name:'中级伤药', desc:'恢复50%HP', price:200 },
+        { category:'战斗类', name:'高级伤药', desc:'恢复80%HP', price:500 },
+        { category:'战斗类', name:'完全伤药', desc:'恢复100%HP', price:1000, limit:'每周限购3' },
+        { category:'战斗类', name:'沉睡之心', desc:'恢复50%HP+消除负面状态，沉睡12小时', price:100, limit:'每周限购2' },
+        { category:'战斗类', name:'解毒药', desc:'解除中毒状态', price:30 },
+        { category:'战斗类', name:'灼伤药', desc:'解除灼伤状态', price:30 },
+        { category:'战斗类', name:'麻痹药', desc:'解除麻痹状态', price:30 },
+        { category:'战斗类', name:'冰冻药', desc:'解除冰冻状态', price:30 },
+        { category:'战斗类', name:'混乱药', desc:'解除混乱状态', price:30 },
+        { category:'战斗类', name:'万能药', desc:'解除所有异常状态', price:200 },
+        { category:'战斗类', name:'技能强化剂', desc:'下一个技能威力+20%', price:150 },
+        { category:'属性精华', name:'地之精华', desc:'地属性战姬攻击力+10%，持续3回合', price:100 },
+        { category:'属性精华', name:'水之精华', desc:'水属性战姬攻击力+10%，持续3回合', price:100 },
+        { category:'属性精华', name:'火之精华', desc:'火属性战姬攻击力+10%，持续3回合', price:100 },
+        { category:'属性精华', name:'风之精华', desc:'风属性战姬攻击力+10%，持续3回合', price:100 },
+        { category:'属性精华', name:'光之精华', desc:'光属性战姬攻击力+10%，持续3回合', price:100 },
+        { category:'属性精华', name:'暗之精华', desc:'暗属性战姬攻击力+10%，持续3回合', price:100 },
+        { category:'养成类', name:'小型经验糖果', desc:'+100经验值', price:50 },
+        { category:'养成类', name:'中型经验糖果', desc:'+300经验值', price:120 },
+        { category:'养成类', name:'大型经验糖果', desc:'+1000经验值', price:200 },
+        { category:'养成类', name:'甜蜜糖果', desc:'好感度+5~10（上限80）', price:100 },
+        { category:'养成类', name:'挚爱糖果', desc:'好感度+30~50（上限80）', price:800 },
+        { category:'融合类', name:'初级融合保护剂', desc:'融合失败时50%几率保护主体', price:500 },
+        { category:'融合类', name:'高级融合保护剂', desc:'融合失败时80%几率保护主体', price:2000 },
+        { category:'融合类', name:'完全融合保护剂', desc:'融合失败时必定保护主体', price:5000, limit:'每周限购1' },
+        { category:'融合类', name:'初级融合催化剂', desc:'融合成功率+5%', price:300 },
+        { category:'融合类', name:'高级融合催化剂', desc:'融合成功率+15%', price:1000 },
+        { category:'融合类', name:'初级相性提升剂', desc:'小幅提升相性等级', price:200 },
+        { category:'融合类', name:'高级相性提升剂', desc:'大幅提升相性等级', price:800 },
+        { category:'特殊类', name:'普通技能学习机', desc:'学会一个普通品质技能（随机）', price:500 },
+        { category:'特殊类', name:'稀有技能学习机', desc:'学会一个稀有品质技能（随机）', price:2000 },
+        { category:'特殊类', name:'史诗技能学习机', desc:'学会一个史诗品质技能（随机）', price:5000, limit:'每周限购3' },
+        { category:'特殊类', name:'传说技能学习机', desc:'学会一个传说品质技能（随机）', price:20000, limit:'极稀有' },
+        { category:'特殊类', name:'指定技能学习机', desc:'学会一个指定技能', price:0, limit:'非卖品' },
+        { category:'特殊类', name:'品质提升石', desc:'A级→S级，觉醒S级专属技能', price:0, limit:'非卖品' },
+        { category:'特殊类', name:'迷魂香', desc:'降低女性抵抗意志，持续10分钟', price:200 }
+      ];
+  
+      function populateCharacterData() {
+    const all_variables = getAllVariables();
+    const statData = _.get(all_variables, 'stat_data', null);
+  
+    if (!statData) {
+      console.warn('stat_data 不存在');
+      return;
+    }
+  
+    currentData = statData;
+         // ✅ 优化玩家名获取，使用多种方式兜底
+    let playerName = _.get(currentData, '玩家名', '');
+    if (!playerName || playerName.trim() === '') {
+      playerName = (window.parent && window.parent.name1) ? window.parent.name1 : (window.name1 || '');
+    }
+    if (!playerName || playerName.trim() === '') {
+      playerName = 'lin'; // 最后兜底
+    }
+    currentData.玩家名 = playerName.trim();
+  
+    const world = _.get(currentData, '世界', {});
+    const dateStr = _.get(world, '日期', '2022年5月8日');
+    const weekStr = _.get(world, '星期', '周日');
+    const timeStr = _.get(world, '时间', '08:00');
+    const goldVal = _.get(currentData, '金币', 0);
+  
+    $('#top-date').text(`📅${dateStr} ${weekStr}`);
+    $('#top-time').text(`⏰${timeStr}`);
+    $('#top-gold').text(goldVal);
+  
+    renderCurrentTab();
+  }
+  
+      function renderCurrentTab() {
+        if (currentView === 'list') {
+          renderList(currentTab);
+        } else if (currentView === 'detail' && selectedCharName) {
+          if (currentTab === 'chars' || currentTab === 'trainer') {
+            renderCharDetail(selectedCharName);
+          } else if (currentTab === 'bag') {
+            renderBagDetail(selectedCharName);
+          } else if (currentTab === 'quest') {
+            renderQuestDetail(selectedCharName);
+          }
+        }
+      }
+  
+      function renderList(type) {
+        const $panel = $(`#panel-${type}`);
+        const $scroll = $panel.find('.list-scroll');
+        $scroll.empty();
+  
+        if (type === 'chars') {
+          renderCharsList($scroll);
+        } else if (type === 'trainer') {
+          renderTrainerPanel($scroll);
+        } else if (type === 'bag') {
+          renderBagList($scroll);
+        } else if (type === 'quest') {
+          renderQuestList($scroll);
+        } else if (type === 'shop') {
+          renderShopList($scroll);
+        }
+      }
+  
+      /* ✅ 修复后的战姬列表 - 已删除敌对战姬分类，解除6人限制 */
+  function renderCharsList($scroll) {
+    const chars = _.get(currentData, '角色数据', {});
+    const playerName = _.get(currentData, '玩家名', '').trim();
+  
+    console.log(`[DEBUG] 玩家名: "${playerName}"`); // 调试日志
+  
+    const collectionRoom = _.get(currentData, '训练家.据点.收藏室', {});
+    const inCollectionFacility = _.get(collectionRoom, '当前使用', []);
+  
+    const workArea = _.get(currentData, '训练家.据点.工作区', {});
+    const inWork = _.get(workArea, '当前使用', []);
+  
+    const battleChars = [];
+  
+    Object.entries(chars).forEach(([name, d]) => {
+      console.log(`[DEBUG] 检查战姬: ${name}, 归属状态: ${d.归属状态}, 从属训练家: "${d.从属训练家}"`); // 调试日志
+  
+      if (d.归属状态 === '离场') return;
+      if (d.归属状态 === '已储存') return;
+  
+      // ✅ 放宽判断条件：只要归属状态是"出战"就显示
+      if (d.归属状态 === '出战') {
+        const owner = (d.从属训练家 || '').trim();
+        // 只有明确隶属于其他人的战姬才排除，空字符串或等于玩家名的都显示
+        const isOtherOwner = owner !== '' && owner !== playerName;
+  
+        if (!isOtherOwner) {
+          const inFacility = inCollectionFacility.includes(name) || inWork.includes(name);
+          battleChars.push({ name, data: d, inFacility });
+          console.log(`[DEBUG] ✅ 添加战姬: ${name}`); // 调试日志
+        } else {
+          console.log(`[DEBUG] ❌ 排除战姬: ${name} (隶属于: ${owner})`); // 调试日志
+        }
+      }
+    });
+  
+    console.log(`[DEBUG] 最终战姬数量: ${battleChars.length}`); // 调试日志
+  
+    if (battleChars.length === 0) {
+      $scroll.html('<div class="list-empty">👾 暂无战姬</div>');
+      return;
+    }
+  
+    let html = '';
+  
+    html += `<div class="category-header" data-category="battle">
+      <span>👊 出战队伍 (${battleChars.length})</span>
+      <span class="toggle-icon">▼</span>
+    </div>`;
+    html += `<div class="category-content" id="cat-battle">`;
+  
+    battleChars.forEach(({ name, data: d, inFacility: inF }) => {
+      const form = d.变化形态 && d.变化形态 !== '无' ? '✨' : '';
+      const quality = d.品质 || 'E';
+      const level = d.等级 || 1;
+      const relation = _.get(d, '个人资料.与训练家关系', '');
+      let locTag = '<span class="location-tag loc-team">👊</span>';
+      if (inF) locTag = '<span class="location-tag loc-facility">🏠</span>';
+  
+      html += `
+        <div class="list-item" data-name="${name}" data-type="char">
+          <div class="item-left">
+            <div class="item-name">${locTag} ${name} ${form}</div>
+            <div class="item-sub">${d.元素属性 || '无'}属性 · ${d.战斗类型 || '均衡型'}</div>
+            ${relation ? `<div class="item-identity">💕 ${relation}</div>` : ''}
+          </div>
+          <div class="item-right">${quality}级 Lv.${level}</div>
+        </div>
+      `;
+    });
+  
+    html += `</div>`;
+  
+    $scroll.html(html);
+  
+    Object.keys(collapsedCategories).forEach(category => {
+      if (collapsedCategories[category]) {
+        $(`.category-header[data-category="${category}"]`).addClass('collapsed');
+        $(`#cat-${category}`).addClass('collapsed');
+      }
+    });
+  }
+  
+      /* 训练家面板 - 收藏室从角色数据筛选 */
+      function renderTrainerPanel($scroll) {
+        const trainer = _.get(currentData, '训练家', {});
+        const playerName = (_.get(currentData, '玩家名', 'lin') || '').trim();
+        const exp = _.get(trainer, '经验值', {});
+        const expPct = exp.升级所需值 ? Math.min(100, (exp.当前值 / exp.升级所需值) * 100) : 0;
+        const skills = _.get(trainer, '技能', {});
+        const equipments = _.get(trainer, '特殊装备', []);
+        const base = _.get(trainer, '据点', {});
+        const isUnlocked = _.get(base, '已解锁', false);
+        const chars = _.get(currentData, '角色数据', {});
+  
+        let html = '';
+  
+        html += `
+          <div class="bar-group">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <div>
+                <div style="font-size:16px;font-weight:bold;color:#f1f5f9;">👤 ${playerName}</div>
+                <div style="font-size:11px;color:#94a3b8;">${trainer.身份 || '训练家'}</div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-size:16px;font-weight:bold;color:#a78bfa;">Lv.${trainer.等级 || 1}</div>
+              </div>
+            </div>
+            <div class="bar-row">
+              <span class="bar-icon">⭐</span>
+              <div class="bar-track"><div class="bar-fill fill-trainer" style="width:${expPct}%"></div></div>
+              <span class="bar-text">${exp.当前值 || 0}/${exp.升级所需值 || 100}</span>
+            </div>
+          </div>
+        `;
+  
+        html += `
+          <div class="section">
+            <div class="section-head" data-section="equips"><span>💎 特殊装备 (最多3个)</span><span class="toggle-icon">▼</span></div>
+            <div class="section-body" id="body-equips">
+        `;
+        if (equipments.length === 0) {
+          html += `<div style="color:#64748b;font-size:11px;padding:6px;">未装备特殊装备</div>`;
+        } else {
+          equipments.forEach(eq => {
+            html += `
+              <div class="special-item-card">
+                <div class="special-item-header">
+                  <div class="special-item-name">💎 ${eq.名称 || '未知'}</div>
+                  ${getRarityTag(eq.稀有度)}
+                </div>
+                <div class="special-item-effect">📝 ${eq.描述 || '无描述'}</div>
+                <div class="special-item-effect" style="color:#34d399;margin-top:4px;">✨ ${eq.效果 || '无效果'}</div>
+              </div>
+            `;
+          });
+        }
+        html += `</div></div>`;
+  
+        html += `
+          <div class="section">
+            <div class="section-head" data-section="tskills"><span>⚡ 训练家技能</span><span class="toggle-icon">▼</span></div>
+            <div class="section-body" id="body-tskills">
+        `;
+        const skillEntries = Object.entries(skills);
+        if (skillEntries.length === 0) {
+          html += `<div style="color:#64748b;font-size:11px;padding:6px;">暂无技能</div>`;
+        } else {
+          skillEntries.forEach(([name, s]) => {
+            const locked = !s.已解锁;
+            const typeTag = s.类型 === '主动' ? '<span class="skill-type-tag stt-active">⚔️</span>' : '<span class="skill-type-tag stt-passive">🛡️</span>';
+            const cd = s.冷却回合 || 0;
+            html += `
+              <div class="skill-card trainer-skill ${locked ? 'locked' : ''}">
+                <div class="skill-header">
+                  <div class="skill-name">${typeTag} ${getRarityTag(s.稀有度)} ${name}</div>
+                  <div class="skill-meta">
+                    ${cd > 0 ? `<span class="skill-cd">⏱️CD:${cd}</span>` : ''}
+                  </div>
+                </div>
+                <div class="skill-desc">${s.描述 || '无描述'}</div>
+                ${s.效果 ? `<div class="skill-formula">💫 ${s.效果}</div>` : ''}
+                ${locked ? `<div class="skill-unlock">🔒 ${s.解锁条件 || '未知条件'}</div>` : ''}
+              </div>
+            `;
+          });
+        }
+        html += `</div></div>`;
+  
+        if (!isUnlocked) {
+          html += `
+            <div class="lock-notice">
+              <div class="lock-icon">🔒</div>
+              <div class="lock-text">据点未解锁</div>
+              <div class="lock-sub">训练家等级达到 Lv.5 后解锁</div>
+              <div class="lock-sub" style="margin-top:5px;">当前等级: Lv.${trainer.等级 || 1} (还需${Math.max(0, 5 - (trainer.等级 || 1))}级)</div>
+            </div>
+          `;
+        } else {
+          html += `
+            <div class="section">
+              <div class="section-head" data-section="base"><span>🏰 据点设施</span><span class="toggle-icon">▼</span></div>
+              <div class="section-body" id="body-base">
+          `;
+  
+          const collectionRoom = _.get(base, '收藏室', {});
+          const collectionLevel = _.get(collectionRoom, '等级', 0);
+          const collectionCapacity = _.get(collectionRoom, '容量上限', 0);
+          const collectionEffect = _.get(collectionRoom, '当前效果', '');
+          const collectionAffection = _.get(collectionRoom, '每日好感加成', 0);
+  
+          /* ✅ 从角色数据中筛选归属状态='已储存'的战姬，优化判断逻辑 */
+          const storedCharList = Object.entries(chars)
+            .filter(([name, d]) => {
+              const owner = (d.从属训练家 || '').trim();
+              return d.归属状态 === '已储存' && (owner === playerName || owner === '');
+            })
+            .map(([name, d]) => ({ name, data: d }));
+  
+          html += `
+            <div class="collection-cabinet">
+              <div class="collection-header">
+                <div class="collection-name">📦 收藏室</div>
+                <span class="collection-level fl-${collectionLevel}">Lv.${collectionLevel}</span>
+              </div>
+              <div style="font-size:10px;color:#94a3b8;margin-bottom:5px;">💤 存放战姬，每日恢复30%HP/MP+${collectionAffection}好感</div>
+              ${collectionLevel > 0 ? `
+                <div class="collection-effect">✨ ${collectionEffect || '无效果'}</div>
+                <div class="collection-capacity">👥 已储存: ${storedCharList.length}/${collectionCapacity}</div>
+                ${storedCharList.length > 0 ? `
+                  <div class="collection-grid">
+                    ${storedCharList.map(({ name, data: d }) => {
+                      const relation = _.get(d, '个人资料.与训练家关系', '');
+                      return `
+                        <div class="collection-slot" data-name="${name}" data-type="char">
+                          <div class="slot-name">${name}</div>
+                          <div class="slot-info">${d.品质 || 'E'}级 Lv.${d.等级 || 1} · ${d.元素属性 || '无'}属性</div>
+                          ${relation ? `<div class="slot-info" style="color:#f472b6;">💕 ${relation}</div>` : ''}
+                        </div>
+                      `;
+                    }).join('')}
+                  </div>
+                ` : '<div style="font-size:10px;color:#64748b;text-align:center;padding:12px;">收藏室为空</div>'}
+              ` : '<div style="font-size:10px;color:#64748b;text-align:center;padding:12px;">未升级（等级0）</div>'}
+            </div>
+          `;
+  
+          const workArea = _.get(base, '工作区', {});
+          const workIsLocked = !_.get(workArea, '已解锁', false);
+          const workLevel = _.get(workArea, '等级', 0);
+          const workName = _.get(workArea, '名称', '');
+          const workCapacity = _.get(workArea, '容量上限', 0);
+          const workEffect = _.get(workArea, '当前效果', '');
+          const workUsers = _.get(workArea, '当前使用', []);
+          const workUnlockCond = _.get(workArea, '解锁条件', '');
+  
+          html += `
+            <div class="facility-card ${workIsLocked ? 'locked' : ''}">
+              <div class="facility-header">
+                <div class="facility-name">💼 工作区</div>
+                <span class="facility-level fl-${workLevel}">Lv.${workLevel}</span>
+              </div>
+              <div style="font-size:10px;color:#94a3b8;margin-bottom:5px;">💰 让战姬打工赚取金币</div>
+              ${!workIsLocked ? `
+                ${workLevel > 0 ? `
+                  <div class="facility-effect">✨ ${workEffect || '无效果'}</div>
+                  <div class="facility-capacity">👥 容量: ${workUsers.length}/${workCapacity}</div>
+                  ${workUsers.length > 0 ? `
+                    <div class="facility-users">
+                      ${workUsers.map(u => `<span class="facility-user">${u}</span>`).join('')}
+                    </div>
+                  ` : '<div  style="font-size:10px;color:#64748b;">暂无战姬</div>'}
+                ` : '<div style="font-size:10px;color:#64748b;text-align:center;padding:12px;">未升级（等级0）</div>'}
+              ` : `
+                <div class="facility-unlock">🔒 ${workUnlockCond || '未知'}</div>
+              `}
+            </div>
+          `;
+  
+          html += `</div></div>`;
+        }
+  
+        $scroll.html(html);
+  
+        /* ✅ 恢复section折叠状态 */
+        Object.keys(collapsedSections).forEach(sectionId => {
+          if (collapsedSections[sectionId]) {
+            $(`.section-head[data-section="${sectionId}"]`).addClass('collapsed');
+            $(`#body-${sectionId}`).addClass('collapsed');
+          }
+        });
+      }
+  
+      function renderBagList($scroll) {
+        const items = _.get(currentData, '背包', {});
+        const keys = Object.keys(items);
+        if (keys.length === 0) {
+          $scroll.html('<div class="list-empty">🎒 背包空空</div>');
+          return;
+        }
+        keys.forEach(name => {
+          const d = items[name];
+          $scroll.append(`
+            <div class="list-item" data-name="${name}" data-type="bag">
+              <div class="item-left">
+                <div class="item-name">📦 ${name}</div>
+                <div class="item-sub">${(d.描述 || '').substring(0, 20)}...</div>
+              </div>
+              <div class="item-right">×${d.数量 || 0}</div>
+            </div>
+          `);
+        });
+      }
+  
+      function renderQuestList($scroll) {
+        const quests = _.get(currentData, '任务列表', {});
+        const keys = Object.keys(quests);
+        if (keys.length === 0) {
+          $scroll.html('<div class="list-empty">📜 暂无任务</div>');
+          return;
+        }
+        keys.forEach(key => {
+          const q = quests[key];
+          if (q.已过期) return;
+          const typeTag = getQuestTypeTag(q.类型);
+          const status = q.已完成 ? '✅' : '🔥';
+          $scroll.append(`
+            <div class="list-item" data-name="${key}" data-type="quest">
+              <div class="item-left">
+                <div class="item-name">${typeTag} ${q.名称 || key}</div>
+                <div class="item-sub">${q.要求 ? q.要求.substring(0, 20) + '...' : ''}</div>
+              </div>
+              <div class="item-right">${status}</div>
+            </div>
+          `);
+        });
+      }
+  
+      function getQuestTypeTag(type) {
+        const map = {
+          '日常任务': ['qt-daily', '📅'],
+          '周常任务': ['qt-weekly', '📆'],
+          '剧情任务': ['qt-story', '📖'],
+          '限时任务': ['qt-limited', '⏰']
+        };
+        const [cls, icon] = map[type] || ['qt-daily', '📅'];
+        return `<span class="quest-tag ${cls}">${icon}</span>`;
+      }
+  
+      function renderShopList($scroll) {
+        const gold = _.get(currentData, '金币', 0);
+        const backpack = _.get(currentData, '背包', {});
+        const itemsByCategory = {};
+        SHOP_ITEMS.forEach(item => {
+          if (!itemsByCategory[item.category]) itemsByCategory[item.category] = [];
+          itemsByCategory[item.category].push(item);
+        });
+  
+        let html = '';
+        Object.entries(itemsByCategory).forEach(([category, items]) => {
+          html += `<div class="category-header" data-category="shop-${category}">
+            <span>${category}</span>
+            <span class="toggle-icon">▼</span>
+          </div>`;
+          html += `<div class="category-content" id="cat-shop-${category.replace(/[^a-zA-Z一-龥]/g,'_')}">`;
+  
+          items.forEach(item => {
+            const owned = _.get(backpack, `${item.name}.数量`, 0);
+            const canAfford = gold >= item.price;
+            const notForSale = item.price === 0;
+            let btnHtml = '';
+            if (notForSale) {
+              btnHtml = `<span style="font-size:11px;color:#64748b;">${item.limit || '暂不售卖'}</span>`;
+            } else {
+              btnHtml = `<button class="shop-buy-btn${item.limit ? ' limited' : ''}" data-item="${item.name}" data-price="${item.price}">🛒 购买</button>`;
+            }
+  
+            html += `
+              <div class="list-item">
+                <div class="item-left">
+                  <div class="item-name">
+                    📦 ${item.name}
+                    ${owned > 0 ? `<span style="font-size:10px;color:#94a3b8;">(已有×${owned})</span>` : ''}
+                  </div>
+                  <div class="item-sub">${item.desc}${item.limit ? ` · ${item.limit}` : ''}</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span class="shop-item-price">🪙${item.price}</span>
+                  ${btnHtml}
+                </div>
+              </div>
+            `;
+          });
+  
+          html += `</div>`;
+        });
+  
+        $scroll.html(html);
+  
+        $scroll.on('click', '.shop-buy-btn', function(e) {
+          e.stopPropagation();
+          const itemName = $(this).data('item');
+          const price = $(this).data('price');
+          showPurchaseModal(itemName, price);
+        });
+  
+        Object.keys(collapsedCategories).forEach(function(category) {
+          if (collapsedCategories[category]) {
+            $('.category-header[data-category="' + category + '"]').addClass('collapsed');
+            $('#cat-' + category).addClass('collapsed');
+          }
+        });
+      }
+  
+      function showPurchaseModal(itemName, price) {
+        pendingPurchase = { name: itemName, price: price };
+        const gold = _.get(currentData, '金币', 0);
+        const item = SHOP_ITEMS.find(i => i.name === itemName);
+        $('#modal-title').text(`🛒 ${itemName}`);
+        $('#modal-desc').text(item ? item.desc : '');
+        const canAfford = gold >= price;
+        $('#modal-price').html(`🪙 ${price} <span style="font-size:12px;color:#94a3b8;">(持有: ${gold})</span>`);
+        $('#modal-confirm').prop('disabled', !canAfford);
+        if (!canAfford) {
+          $('#modal-price').append('<div class="insufficient" style="font-size:12px;margin-top:4px;">❌ 金币不足！</div>');
+        }
+        $('#shop-modal').addClass('show');
+      }
+  
+      function hidePurchaseModal() {
+        $('#shop-modal').removeClass('show');
+        pendingPurchase = null;
+      }
+  
+      function notify(msg, type) {
+        if (typeof toastr !== 'undefined' && toastr[type]) {
+          toastr[type](msg);
+        } else {
+          console.log('[购买] ' + msg);
+        }
+      }
+  
+      async function confirmPurchase() {
+        if (!pendingPurchase) return;
+        var name = pendingPurchase.name;
+        var price = pendingPurchase.price;
+        var gold = _.get(currentData, '金币', 0);
+        if (gold < price) {
+          notify('金币不足，无法购买！', 'warning');
+          hidePurchaseModal();
+          return;
+        }
+  
+        try {
+          if (typeof updateVariablesWith !== 'function') {
+            notify('变量更新不可用，请刷新页面', 'error');
+            hidePurchaseModal();
+            return;
+          }
+          await updateVariablesWith(function(variables) {
+            var newGold = gold - price;
+            _.set(variables, 'stat_data.金币', newGold);
+  
+            var backpack = _.get(variables, 'stat_data.背包', {});
+            var oldQty = _.get(backpack, name + '.数量', 0) || 0;
+            _.set(variables, 'stat_data.背包.' + name, {
+              描述: name,
+              数量: oldQty + 1
+            });
+          }, { type: 'message' });
+  
+          currentData.金币 = gold - price;
+          var bp = _.get(currentData, '背包', {});
+          var oldQty = _.get(bp, name + '.数量', 0) || 0;
+          _.set(currentData, '背包.' + name, { 描述: name, 数量: oldQty + 1 });
+  
+          $('#top-gold').text(currentData.金币);
+          notify('成功购买 ' + name + '！', 'success');
+  
+          renderCurrentTab();
+          hidePurchaseModal();
+        } catch (e) {
+          console.error('购买失败:', e);
+          notify('购买失败，请重试', 'error');
+          hidePurchaseModal();
+        }
+      }
+  
+      function switchTab(tab) {
+        currentTab = tab;
+        currentView = 'list';
+        selectedCharName = null;
+  
+        $('.nav-item').removeClass('active');
+        $(`#nav-${tab}`).addClass('active');
+  
+        $('.list-panel').removeClass('active');
+        $('#detail-panel').removeClass('active');
+        $(`#panel-${tab}`).addClass('active');
+  
+        renderList(tab);
+      }
+  
+      function showCharDetail(name) {
+        selectedCharName = name;
+        currentView = 'detail';
+  
+        $('.list-panel').removeClass('active');
+        $('#detail-panel').addClass('active');
+  
+        renderCharDetail(name);
+      }
+  
+      function showItemDetail(name, type) {
+        selectedCharName = name;
+        currentView = 'detail';
+  
+        $('.list-panel').removeClass('active');
+        $('#detail-panel').addClass('active');
+  
+        if (type === 'bag') {
+          renderBagDetail(name);
+        } else if (type === 'quest') {
+          renderQuestDetail(name);
+        }
+      }
+  
+      function goBack() {
+        currentView = 'list';
+        selectedCharName = null;
+  
+        $('#detail-panel').removeClass('active');
+        $(`#panel-${currentTab}`).addClass('active');
+  
+        renderList(currentTab);
+      }
+  
+      function getFormTag(form) {
+        if (!form || form === '无') return '<span class="form-tag form-none">⚪ 无</span>';
+        const map = {
+          '天使化': ['form-angel', '👼'],
+          '恶魔化': ['form-demon', '😈'],
+          '精灵化': ['form-elf', '🧝'],
+          '兽人化': ['form-beast', '🐾']
+        };
+        const [cls, icon] = map[form] || ['form-none', '⚪'];
+        return `<span class="form-tag ${cls}">${icon} ${form}</span>`;
+      }
+  
+      function getSensTag(sens) {
+        const map = {
+          '迟钝': 'sens-dull',
+          '普通': 'sens-normal',
+          '敏感': 'sens-sensitive',
+          '过敏': 'sens-hyper',
+          '淫乱': 'sens-lewd'
+        };
+        return `<span class="sens-tag ${map[sens] || 'sens-normal'}">${sens || '普通'}</span>`;
+      }
+  
+      function getSkillTypeTag(type) {
+        const map = {
+          '主动': ['stt-active', '⚔️'],
+          '被动': ['stt-passive','🛡️'],
+          '光环': ['stt-aura', '✨'],
+          '天赋': ['stt-talent', '🌟']
+        };
+        const [cls, icon] = map[type] || ['stt-active', '⚔️'];
+        return `<span class="skill-type-tag ${cls}">${icon}</span>`;
+      }
+  
+      function getRarityTag(rarity) {
+        const map = {
+          '普通': 'sr-normal',
+          '稀有': 'sr-rare',
+          '史诗': 'sr-epic',
+          '传说': 'sr-legend',
+          '神话': 'sr-myth'
+        };
+        return `<span class="skill-rarity ${map[rarity] || 'sr-normal'}">${rarity || '普通'}</span>`;
+      }
+  
+      function renderCharDetail(name) {
+        const data = _.get(currentData, `角色数据.${name}`, null);
+        if (!data) return;
+  
+        const playerName = (_.get(currentData, '玩家名', 'lin') || '').trim();
+        const $scroll = $('#detail-scroll');
+  
+        $('#detail-name').text(name);
+        $('#detail-badge').text(`${data.品质 || 'E'}级 Lv.${data.等级 || 1}`);
+  
+        const relation = _.get(data, '个人资料.与训练家关系', '');
+        const owner = (data.从属训练家 || '').trim();
+        let ownerHtml = '';
+        if (relation) {
+          ownerHtml = `<div class="char-identity">💕 ${relation}</div>`;
+        }
+        if (owner && owner !== playerName) {
+          ownerHtml += `<div class="char-owner">👤 隶属于 <span class="owner-name">${owner}</span></div>`;
+        }
+        $('#detail-owner').html(ownerHtml);
+  
+        let html = '';
+  
+        const thought = data.当前想法 || '';
+        if (thought) {
+          html += `<div class="thought-box">${thought}</div>`;
+        }
+  
+        const hp = data.生命值 || {};
+        const mp = data.法力值 || {};
+        const exp = data.经验值 || {};
+        const hpPct = hp.最大值 ? Math.min(100, (hp.当前值 / hp.最大值) * 100) : 0;
+        const mpPct = mp.最大值 ? Math.min(100, (mp.当前值 / mp.最大值) * 100) : 0;
+        const expPct = exp.升级所需值 ? Math.min(100, (exp.当前值 / exp.升级所需值) * 100) : 0;
+  
+        html += `
+          <div class="bar-group">
+            <div class="bar-row">
+              <span class="bar-icon">❤️</span>
+              <div class="bar-track"><div class="bar-fill fill-hp" style="width:${hpPct}%"></div></div>
+              <span class="bar-text">${hp.当前值 || 0}/${hp.最大值 || 0}</span>
+            </div>
+            <div class="bar-row">
+              <span class="bar-icon">💧</span>
+              <div class="bar-track"><div class="bar-fill fill-mp" style="width:${mpPct}%"></div></div>
+              <span class="bar-text">${mp.当前值 || 0}/${mp.最大值 || 0}</span>
+            </div>
+            <div class="bar-row">
+              <span class="bar-icon">⭐</span>
+              <div class="bar-track"><div class="bar-fill fill-exp" style="width:${expPct}%"></div></div>
+              <span class="bar-text">${exp.当前值 || 0}/${exp.升级所需值 || 100}</span>
+            </div>
+          </div>
+        `;
+  
+        html += `
+          <div class="section">
+            <div class="section-head" data-section="basic"><span>📊 基础资料</span><span class="toggle-icon">▼</span></div>
+            <div class="section-body" id="body-basic">
+              <div class="data-grid">
+                <div class="data-cell"><span class="cell-label">⚔️ 类型</span><span class="cell-value">${data.战斗类型 || '均衡'}</span></div>
+                <div class="data-cell"><span class="cell-label">🔮 属性</span><span class="cell-value">${data.元素属性 || '无'}</span></div>
+                <div class="data-cell"><span class="cell-label">😊 性格</span><span class="cell-value">${data.性格 || '认真'}</span></div>
+                <div class="data-cell"><span class="cell-label">💫 资质</span><span class="cell-value">${data.资质 || '普通'}</span></div>
+                <div class="data-cell full"><span class="cell-label">✨ 变化形态</span><span class="cell-value">${getFormTag(data.变化形态)}</span></div>
+                <div class="data-cell"><span class="cell-label">💕 好感度</span><span class="cell-value love">${data.好感度 || 0}</span></div>
+                <div class="data-cell"><span class="cell-label">😈 堕落值</span><span class="cell-value corr">${data.堕落值 || 0}</span></div>
+              </div>
+            </div>
+          </div>
+        `;
+  
+        html += `
+          <div class="section">
+            <div class="section-head" data-section="stats"><span>⚡ 属性面板</span><span class="toggle-icon">▼</span></div>
+            <div class="section-body" id="body-stats">
+              <div class="data-grid">
+                <div class="data-cell"><span class="cell-label">⚔️ 攻击力</span><span class="cell-value">${data.攻击力 || 0}</span></div>
+                <div class="data-cell"><span class="cell-label">🛡️ 防御力</span><span class="cell-value">${data.防御力 || 0}</span></div>
+                <div class="data-cell"><span class="cell-label">🔮 特攻</span><span class="cell-value">${data.特攻 || 0}</span></div>
+                <div class="data-cell"><span class="cell-label">💎 特防</span><span class="cell-value">${data.特防 || 0}</span></div>
+                <div class="data-cell full"><span class="cell-label">⚡ 速度</span><span class="cell-value">${data.速度 || 0}</span></div>
+              </div>
+            </div>
+          </div>
+        `;
+  
+        const equip = data.着装 || {};
+        html += `
+          <div class="section">
+            <div class="section-head" data-section="equip"><span>👗 着装</span><span class="toggle-icon">▼</span></div>
+            <div class="section-body" id="body-equip">
+        `;
+        if (equip.上装 || equip.下装 || equip.内衣 || equip.鞋袜 || equip.饰品) {
+          if (equip.上装) html += `<div class="equip-item"><span class="equip-icon">👚</span><span class="equip-name">${equip.上装}</span></div>`;
+          if (equip.下装) html += `<div class="equip-item"><span class="equip-icon">👖</span><span class="equip-name">${equip.下装}</span></div>`;
+          if (equip.内衣) html += `<div class="equip-item"><span class="equip-icon">👙</span><span class="equip-name">${equip.内衣}</span></div>`;
+          if (equip.鞋袜) html += `<div class="equip-item"><span class="equip-icon">👠</span><span class="equip-name">${equip.鞋袜}</span></div>`;
+          if (equip.饰品) html += `<div class="equip-item"><span class="equip-icon">💍</span><span class="equip-name">${equip.饰品}</span></div>`;
+        } else {
+          html += '<div style="color:#64748b; font-size:11px; padding:6px;">无装备</div>';
+        }
+        html += `</div></div>`;
+  
+        const battleOutfit = data.战斗衣着 || '';
+        html += `
+          <div class="section">
+            <div class="section-head" data-section="battle-outfit"><span>⚔️ 战斗服饰</span><span class="toggle-icon">▼</span></div>
+            <div class="section-body" id="body-battle-outfit">
+              ${battleOutfit ? `
+                <div class="profile-item" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(79, 70, 229, 0.1) 100%); border: 1px solid rgba(99, 102, 241, 0.3);">
+                  <div style="font-size:13px;font-weight:bold;color:#a5b4fc;margin-bottom:4px;">⚔️ 专属战斗装</div>
+                  <div style="font-size:12px;color:#e2e8f0;line-height:1.5;">${battleOutfit}</div>
+                </div>
+              ` : '<div style="color:#64748b; font-size:11px; padding:6px;">未设定战斗服饰</div>'}
+            </div>
+          </div>
+        `;
+  
+        const skills = data.技能 || {};
+        html += `
+          <div class="section">
+            <div class="section-head" data-section="skills"><span>⚡ 技能列表</span><span class="toggle-icon">▼</span></div>
+            <div class="section-body" id="body-skills">
+        `;
+        const skillEntries = Object.entries(skills);
+        if (skillEntries.length === 0) {
+          html += '<div style="color:#64748b; font-size:11px; padding:6px;">暂无技能</div>';
+        } else {
+          skillEntries.forEach(([skillName, skill]) => {
+            const typeTag = getSkillTypeTag(skill.类型);
+            const rarityTag = getRarityTag(skill.稀有度);
+            const mp = skill.消耗MP || 0;
+            const cd = skill.冷却回合 || 0;
+            const power = skill.基础威力 || 0;
+  
+            html += `
+              <div class="skill-card">
+                <div class="skill-header">
+                  <div class="skill-name">${typeTag} ${rarityTag} ${skillName}</div>
+                  <div  class="skill-meta">
+                    ${mp > 0 ? `<span class="skill-mp">💧${mp}</span>` : ''}
+                    ${cd > 0 ? `<span class="skill-cd">⏱️CD:${cd}</span>` : ''}
+                    ${power > 0 ? `<span style="font-size:10px;color:#f59e0b;font-weight:bold;">💥${power}</span>` : ''}
+                  </div>
+                </div>
+                <div class="skill-desc">${skill.描述 || '无描述'}</div>
+                ${skill.效果公式 ? `<div class="skill-formula">📐 ${skill.效果公式}</div>` : ''}
+              </div>
+            `;
+          });
+        }
+        html += `</div></div>`;
+  
+        const profile = data.个人资料 || {};
+        html += `
+          <div class="section">
+            <div class="section-head" data-section="profile"><span>📋 个人资料</span><span class="toggle-icon">▼</span></div>
+            <div class="section-body" id="body-profile">
+        `;
+        if (profile.原身份) html += `<div class="profile-item"><span class="p-label">🎭 原身份：</span><span class="p-value">${profile.原身份}</span></div>`;
+        if (profile.捕获经过) html += `<div class="profile-item"><span class="p-label">📖 捕获经过：</span><span class="p-value">${profile.捕获经过}</span></div>`;
+        if (profile.过往经历) html += `<div class="profile-item"><span class="p-label">📜 过往经历：</span><span class="p-value">${profile.过往经历}</span></div>`;
+        if (profile.与训练家关系) html += `<div class="profile-item"><span class="p-label">💕 与训练家关系：</span><span="p-value">${profile.与训练家关系}</span></div>`;
+        if (profile.喜好体位) html += `<div class="profile-item highlight"><span class="p-label">💗 喜好体位：</span><span class="p-value">${profile.喜好体位}</span></div>`;
+        if (profile.性癖) html += `<div class="profile-item highlight"><span class="p-label">💋 性癖：</span><span class="p-value">${profile.性癖}</span></div>`;
+        if (profile.性格特征) html += `<div class="profile-item"><span class="p-label">✨ 性格特征：</span><span class="p-value">${profile.性格特征}</span></div>`;
+        html += `</div></div>`;
+  
+        const sexual = data.性器状态 || {};
+        let sexualHtml = '';
+  
+        if (Object.keys(sexual).length > 0) {
+          sexualHtml += `
+            <div class="overall-card">
+              <div class="overall-row"><span class="overall-label">💕 整体淫乱度</span><span class="overall-value">${sexual.整体淫乱度 || 0}%</span></div>
+              <div class="overall-row"><span class="overall-label">🔥 当前性欲</span><span class="overall-value">${sexual.当前性欲 || 0}%</span></div>
+              <div class="overall-row"><span class="overall-label">📊 性经验次数</span><span class="overall-value">${sexual.性经验次数 || 0}次</span></div>
+              <div class="overall-row"><span class="overall-label">💦 高潮体质</span><span class="overall-value">${sexual.高潮体质 || '普通'}</span></div>
+            </div>
+          `;
+  
+          const organs = [
+            ['🍒', '胸部', sexual.胸部 || {}, ['尺寸', '乳头状态']],
+            ['🌸', '阴部', sexual.阴部 || {}, ['处女膜', '紧致度']],
+            ['💎', '阴蒂', sexual.阴蒂 || {}, ['大小']],
+            ['🍑', '后庭', sexual.后庭 || {}, ['紧致度']],
+            ['💗', '子宫', sexual.子宫 || {}, ['状态']],
+            ['👄', '口腔', sexual.口腔 || {}, ['技巧', '深喉适应']]
+          ];
+  
+          sexualHtml += '<div class="organ-grid">';
+          organs.forEach(([icon, oname, odata, fields]) => {
+            let rows = '';
+            fields.forEach(f => {
+              if (odata[f]) {
+                rows += `<div class="organ-row"><span class="organ-label">${f}</span><span class="organ-value">${odata[f]}</span></div>`;
+              }
+            });
+            if (odata.敏感度) {
+              rows += `<div class="organ-row"><span class="organ-label">敏感度</span>${getSensTag(odata.敏感度)}</div>`;
+            }
+            const dev = odata.开发度;
+            const currentState = odata.当前状态 || '';
+  
+            sexualHtml += `
+              <div class="organ-card">
+                <div class="organ-title">${icon} ${oname}</div>
+                ${rows}
+                ${dev !== undefined ? `<div class="organ-row"><span class="organ-label">开发度</span><span class="organ-value">${dev}%</span></div><div class="dev-bar"><div class="dev-fill" style="width:${dev}%"></div></div>` : ''}
+                ${currentState ? `<div class="organ-state">👁️ ${currentState}</div>` : ''}
+              </div>
+            `;
+          });
+          sexualHtml += '</div>';
+        } else {
+          sexualHtml = '<div style="color:#64748b; font-size:11px; padding:6px;">暂无数据</div>';
+        }
+  
+        html += `
+          <div class="section">
+            <div class="section-head" data-section="sexual"><span>💕 性器状态</span><span class="toggle-icon">▼</span></div>
+            <div class="section-body" id="body-sexual">
+              ${sexualHtml}
+            </div>
+          </div>
+        `;
+  
+        $scroll.html(html);
+  
+        Object.keys(collapsedSections).forEach(sectionId => {
+          if (collapsedSections[sectionId]) {
+            $(`.section-head[data-section="${sectionId}"]`).addClass('collapsed');
+            $(`#body-${sectionId}`).addClass('collapsed');
+          }
+        });
+      }
+  
+      function renderBagDetail(name) {
+        const data = _.get(currentData, `背包.${name}`, {});
+  
+        $('#detail-name').text(`🎒 ${name}`);
+        $('#detail-badge').text(`×${data.数量 || 0}`);
+        $('#detail-owner').html('');
+  
+        $('#detail-scroll').html(`
+          <div class="info-card">
+            <div class="info-row">
+              <span class="info-label">📝 描述</span>
+              <span class="info-value">${data.描述 || '无描述'}</span>
+            </div>
+          </div>
+        `);
+      }
+  
+      function renderQuestDetail(key) {
+        const data = _.get(currentData, `任务列表.${key}`, {});
+  
+        $('#detail-name').text(`📜 ${data.名称 || key}`);
+        $('#detail-badge').text(data.类型 || '任务');
+        $('#detail-owner').html('');
+  
+        const statusCls = data.已完成 ? 'qs-done' : 'qs-progress';
+        const statusText = data.已完成 ? '✅ 已完成' : '⏳ 进行中';
+  
+        $('#detail-scroll').html(`
+          <div class="info-card">
+            <div class="quest-status ${statusCls}">${statusText}</div>
+            <div class="info-row">
+              <span class="info-label">📋 要求</span>
+              <span class="info-value">${data.要求 || '-'}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">🎁 奖励</span>
+              <span class="info-value reward">${data.奖励 || '-'}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">⏰ 期限</span>
+              <span class="info-value">${data.期限 || '无限制'}</span>
+            </div>
+            ${data.进度 ? `<div class="info-row"><span class="info-label">📊 进度</span><span class="info-value">${data.进度}</span></div>` : ''}
+          </div>
+        `);
+      }
+  
+      function toggleSection(sectionId) {
+        const $head = $(`.section-head[data-section="${sectionId}"]`);
+        const $body = $(`#body-${sectionId}`);
+        $head.toggleClass('collapsed');
+        $body.toggleClass('collapsed');
+  
+        collapsedSections[sectionId] = $head.hasClass('collapsed');
+      }
+  
+      function toggleCategory(category, event) {
+        if (event) {
+          event.stopPropagation();
+        }
+  
+        const $head = $(`.category-header[data-category="${category}"]`);
+        const $content = $(`#cat-${category}`);
+  
+        $head.toggleClass('collapsed');
+        $content.toggleClass('collapsed');
+  
+        collapsedCategories[category] = $head.hasClass('collapsed');
+      }
+  
+      async function init() {
+        if (window._mobileStatusInitialized) return;
+        window._mobileStatusInitialized = true;
+
+        await waitGlobalInitialized('Mvu');
+        populateCharacterData();
+
+        // 监听变量更新事件，实现自动刷新
+        eventOn(Mvu.events.VARIABLE_UPDATE_ENDED, () => {
+          populateCharacterData();
+        });
+
+        // 导航标签切换
+        $('#nav-chars').on('click', () => switchTab('chars'));
+        $('#nav-trainer').on('click', () => switchTab('trainer'));
+        $('#nav-bag').on('click', () => switchTab('bag'));
+        $('#nav-quest').on('click', () => switchTab('quest'));
+        $('#nav-shop').on('click', () => switchTab('shop'));
+
+        // 商店购买弹窗
+        $('#modal-cancel').on('click', hidePurchaseModal);
+        $('#modal-confirm').on('click', confirmPurchase);
+        $('#shop-modal').on('click', function(e) {
+          if (e.target === this) hidePurchaseModal();
+        });
+
+        // 列表项点击 → 详情
+        $(document).on('click', '.list-item, .collection-slot', function() {
+          const name = $(this).data('name');
+          const type = $(this).data('type');
+          if (type === 'char') {
+            showCharDetail(name);
+          } else if (type === 'bag') {
+            showItemDetail(name, type);
+          } else if (type === 'quest') {
+            showItemDetail(name, type);
+          }
+        });
+
+        // 顶部按钮
+        $('#btn-back').on('click', goBack);
+        $('#btn-refresh').on('click', function() {
+          $(this).addClass('spinning');
+          populateCharacterData();
+          setTimeout(() => $(this).removeClass('spinning'), 500);
+        });
+        $('#btn-collapse').on('click', function() {
+          $('#app').toggleClass('collapsed');
+          $(this).text($('#app').hasClass('collapsed') ? '▲' : '▼');
+        });
+
+        // 折叠展开
+        $(document).on('click', '.section-head', function() {
+          const section = $(this).data('section');
+          toggleSection(section);
+        });
+        $(document).on('click', '.category-header', function(e) {
+          const category = $(this).data('category');
+          toggleCategory(category, e);
+        });
+      }
+
+      $(errorCatched(init));
+    </script>
+  </head>
+  <body>
+    <div id="app">
+      <div class="top-bar">
+        <div class="top-left">
+          <button class="top-btn" id="btn-refresh">🔄</button>
+          <div class="top-info">
+            <span id="top-date">📅5月8日 周日</span>
+            <span id="top-time">⏰08:00</span>
+          </div>
+        </div>
+        <div class="top-btns">
+          <div class="gold-badge">🪙 <span id="top-gold">0</span></div>
+          <button class="top-btn" id="btn-collapse">▼</button>
+        </div>
+      </div>
+  
+      <div class="main-content">
+        <div class="list-panel active" id="panel-chars">
+          <div class="list-header">⚔️ 战姬列表</div>
+          <div class="list-scroll"></div>
+        </div>
+  
+        <div class="list-panel" id="panel-trainer">
+          <div class="list-header">👤 训练家</div>
+          <div class="list-scroll"></div>
+        </div>
+  
+        <div class="list-panel" id="panel-bag">
+          <div class="list-header">🎒 背包</div>
+          <div class="list-scroll"></div>
+        </div>
+  
+        <div class="list-panel" id="panel-quest">
+          <div class="list-header">📜 任务</div>
+          <div class="list-scroll"></div>
+        </div>
+  
+        <div class="list-panel" id="panel-shop">
+          <div class="list-header">🏪 商店</div>
+          <div class="list-scroll"></div>
+        </div>
+  
+        <div class="modal-overlay" id="shop-modal">
+          <div class="modal-box">
+            <div class="modal-title" id="modal-title"></div>
+            <div class="modal-desc" id="modal-desc"></div>
+            <div class="modal-price" id="modal-price"></div>
+            <div class="modal-btns">
+              <button class="modal-btn cancel" id="modal-cancel">取消</button>
+              <button class="modal-btn confirm" id="modal-confirm">确认购买</button>
+            </div>
+          </div>
+        </div>
+  
+        <div class="detail-panel" id="detail-panel">
+          <div class="detail-header">
+            <div class="detail-header-top">
+              <button class="back-btn" id="btn-back">← 返回</button>
+              <span class="char-badge" id="detail-badge">Lv.1</span>
+            </div>
+            <div class="char-name" id="detail-name">NAME</div>
+            <div id="detail-owner"></div>
+          </div>
+          <div class="detail-scroll" id="detail-scroll"></div>
+        </div>
+      </div>
+  
+      <div class="bottom-nav">
+        <div class="nav-item active" id="nav-chars">
+          <span class="nav-icon">⚔️</span>
+          <span class="nav-text">战姬</span>
+        </div>
+        <div class="nav-item" id="nav-trainer">
+          <span class="nav-icon">👤</span>
+          <span class="nav-text">训练家</span>
+        </div>
+        <div class="nav-item" id="nav-bag">
+          <span class="nav-icon">🎒</span>
+          <span class="nav-text">背包</span>
+        </div>
+        <div class="nav-item" id="nav-quest">
+          <span class="nav-icon">📜</span>
+          <span class="nav-text">任务</span>
+        </div>
+        <div class="nav-item" id="nav-shop">
+          <span class="nav-icon">🏪</span>
+          <span class="nav-text">商店</span>
+        </div>
+      </div>
+    </div>
+  </body>
+  </html>

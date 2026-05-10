@@ -1,0 +1,17 @@
+{
+  "type": "script",
+  "enabled": true,
+  "name": "战姬战斗系统-dev",
+  "id": "d5112fd8-9fcf-4faf-8f0b-dae652550535",
+  "content": "import 'http://localhost:5500/dist/战姬/脚本/战斗系统/index.js'",
+  "buttons": [
+    {
+      "name": "开始战斗",
+      "visible": true
+    },
+    {
+      "name": "调试战斗",
+      "visible": true
+    }
+  ]
+}

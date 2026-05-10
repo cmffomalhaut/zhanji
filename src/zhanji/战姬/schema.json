@@ -1,0 +1,1076 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "current_target": {
+      "type": "string"
+    },
+    "current_event": {
+      "type": "string"
+    },
+    "玩家名": {
+      "default": "lin",
+      "type": "string"
+    },
+    "世界": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "时间": {
+          "default": "08:00",
+          "type": "string"
+        },
+        "日期": {
+          "default": "2022年5月8日",
+          "type": "string"
+        },
+        "星期": {
+          "default": "周日",
+          "type": "string",
+          "enum": [
+            "周一",
+            "周二",
+            "周三",
+            "周四",
+            "周五",
+            "周六",
+            "周日"
+          ]
+        },
+        "地点": {
+          "default": "初始城镇",
+          "type": "string"
+        },
+        "天气": {
+          "default": "晴",
+          "type": "string"
+        },
+        "近期事务": {
+          "default": "无",
+          "type": "string"
+        },
+        "_上次结算日期": {
+          "default": "2022年5月8日",
+          "type": "string"
+        },
+        "_任务上次刷新日期": {
+          "type": "string"
+        }
+      }
+    },
+    "金币": {
+      "type": "number"
+    },
+    "训练家": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "身份": {
+          "type": "string"
+        },
+        "等级": {
+          "default": 1,
+          "type": "number"
+        },
+        "经验值": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "当前值": {
+              "type": "number"
+            },
+            "升级所需值": {
+              "default": 100,
+              "type": "number"
+            }
+          }
+        },
+        "技能": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "类型": {
+                "default": "被动",
+                "type": "string",
+                "enum": [
+                  "主动",
+                  "被动"
+                ]
+              },
+              "稀有度": {
+                "default": "稀有",
+                "type": "string",
+                "enum": [
+                  "普通",
+                  "稀有",
+                  "史诗",
+                  "传说",
+                  "神话"
+                ]
+              },
+              "获取途径": {
+                "type": "string"
+              },
+              "解锁条件": {
+                "type": "string"
+              },
+              "已解锁": {
+                "type": "boolean"
+              },
+              "冷却回合": {
+                "type": "number"
+              },
+              "使用次数": {
+                "default": -1,
+                "type": "number"
+              },
+              "描述": {
+                "type": "string"
+              },
+              "效果": {
+                "type": "string"
+              },
+              "效果公式": {
+                "type": "string"
+              },
+              "数值参数": {
+                "default": {},
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "number"
+                }
+              }
+            }
+          }
+        },
+        "特殊装备": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "名称": {
+                "type": "string"
+              },
+              "稀有度": {
+                "default": "普通",
+                "type": "string",
+                "enum": [
+                  "普通",
+                  "稀有",
+                  "史诗",
+                  "传说",
+                  "神话"
+                ]
+              },
+              "获取途径": {
+                "type": "string"
+              },
+              "描述": {
+                "type": "string"
+              },
+              "效果": {
+                "type": "string"
+              },
+              "效果公式": {
+                "type": "string"
+              },
+              "数值参数": {
+                "default": {},
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "number"
+                }
+              }
+            }
+          }
+        },
+        "据点": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "已解锁": {
+              "type": "boolean"
+            },
+            "解锁条件": {
+              "default": "训练家等级达到Lv.5",
+              "type": "string"
+            },
+            "收藏室": {
+              "default": {},
+              "type": "object",
+              "properties": {
+                "已解锁": {
+                  "type": "boolean"
+                },
+                "解锁条件": {
+                  "default": "据点解锁后自动解锁",
+                  "type": "string"
+                },
+                "等级": {
+                  "default": 1,
+                  "type": "number"
+                },
+                "容量上限": {
+                  "default": 5,
+                  "type": "number"
+                },
+                "当前效果": {
+                  "type": "string"
+                },
+                "每日好感加成": {
+                  "type": "number"
+                },
+                "升级费用": {
+                  "type": "number"
+                },
+                "当前使用": {
+                  "default": [],
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "工作区": {
+              "default": {},
+              "type": "object",
+              "properties": {
+                "已解锁": {
+                  "type": "boolean"
+                },
+                "解锁条件": {
+                  "type": "string"
+                },
+                "解锁方式": {
+                  "default": "等级",
+                  "type": "string",
+                  "enum": [
+                    "等级",
+                    "任务",
+                    "金币",
+                    "特殊"
+                  ]
+                },
+                "解锁需求值": {
+                  "type": "number"
+                },
+                "等级": {
+                  "default": 1,
+                  "type": "number"
+                },
+                "名称": {
+                  "type": "string"
+                },
+                "当前效果": {
+                  "type": "string"
+                },
+                "效果数值": {
+                  "type": "number"
+                },
+                "升级费用": {
+                  "type": "number"
+                },
+                "当前使用": {
+                  "default": [],
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "容量上限": {
+                  "default": 3,
+                  "type": "number"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "收藏室": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "背包": {
+      "default": {},
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "描述": {
+            "type": "string"
+          },
+          "数量": {
+            "default": 1,
+            "type": "number"
+          }
+        }
+      }
+    },
+    "任务列表": {
+      "default": {},
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "名称": {
+            "type": "string"
+          },
+          "要求": {
+            "type": "string"
+          },
+          "奖励": {
+            "type": "string"
+          },
+          "类型": {
+            "default": "日常任务",
+            "type": "string",
+            "enum": [
+              "日常任务",
+              "周常任务",
+              "剧情任务",
+              "限时任务"
+            ]
+          },
+          "期限": {
+            "type": "string"
+          },
+          "已完成": {
+            "type": "boolean"
+          },
+          "已过期": {
+            "type": "boolean"
+          },
+          "进度": {
+            "type": "string"
+          },
+          "标签": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "优先级": {
+            "default": "中",
+            "type": "string",
+            "enum": [
+              "低",
+              "中",
+              "高",
+              "紧急"
+            ]
+          },
+          "图标": {
+            "type": "string"
+          },
+          "发布者": {
+            "default": "系统",
+            "type": "string"
+          },
+          "背景色": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "_任务奖励映射": {
+      "default": {},
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
+    },
+    "角色数据": {
+      "default": {},
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "状态": {
+            "default": "正常",
+            "type": "string",
+            "enum": [
+              "正常",
+              "濒死",
+              "死亡",
+              "异常"
+            ]
+          },
+          "从属训练家": {
+            "type": "string"
+          },
+          "归属状态": {
+            "default": "出战",
+            "type": "string",
+            "enum": [
+              "出战",
+              "已储存",
+              "离场"
+            ]
+          },
+          "个人资料": {
+            "default": {},
+            "type": "object",
+            "properties": {
+              "原身份": {
+                "type": "string"
+              },
+              "捕获经过": {
+                "type": "string"
+              },
+              "过往经历": {
+                "type": "string"
+              },
+              "与训练家关系": {
+                "type": "string"
+              },
+              "喜好体位": {
+                "type": "string"
+              },
+              "性癖": {
+                "type": "string"
+              },
+              "性格特征": {
+                "type": "string"
+              }
+            }
+          },
+          "等级": {
+            "default": 1,
+            "type": "number"
+          },
+          "品质": {
+            "default": "E",
+            "type": "string",
+            "enum": [
+              "E",
+              "D",
+              "C",
+              "B",
+              "A",
+              "S"
+            ]
+          },
+          "资质": {
+            "default": "普通",
+            "type": "string",
+            "enum": [
+              "天才",
+              "优秀",
+              "普通",
+              "平庸"
+            ]
+          },
+          "性格": {
+            "default": "认真",
+            "type": "string",
+            "enum": [
+              "固执",
+              "孤僻",
+              "勇敢",
+              "调皮",
+              "内敛",
+              "稳重",
+              "冷静",
+              "马虎",
+              "胆小",
+              "急躁",
+              "开朗",
+              "天真",
+              "大胆",
+              "悠闲",
+              "淘气",
+              "温和",
+              "自大",
+              "慎重",
+              "坦率",
+              "认真",
+              "害羞"
+            ]
+          },
+          "战斗类型": {
+            "default": "均衡型",
+            "type": "string",
+            "enum": [
+              "均衡型",
+              "强攻型",
+              "重盾型",
+              "魔导型",
+              "敏捷型"
+            ]
+          },
+          "元素属性": {
+            "default": "地",
+            "type": "string",
+            "enum": [
+              "地",
+              "火",
+              "水",
+              "风",
+              "光",
+              "暗"
+            ]
+          },
+          "好感度": {
+            "type": "number"
+          },
+          "堕落值": {
+            "type": "number"
+          },
+          "当前想法": {
+            "type": "string"
+          },
+          "已触发事件": {
+            "default": {},
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "boolean"
+            }
+          },
+          "生命值": {
+            "default": {},
+            "type": "object",
+            "properties": {
+              "当前值": {
+                "type": "number"
+              },
+              "最大值": {
+                "type": "number"
+              }
+            }
+          },
+          "法力值": {
+            "default": {},
+            "type": "object",
+            "properties": {
+              "当前值": {
+                "type": "number"
+              },
+              "最大值": {
+                "type": "number"
+              }
+            }
+          },
+          "经验值": {
+            "default": {},
+            "type": "object",
+            "properties": {
+              "当前值": {
+                "type": "number"
+              },
+              "升级所需值": {
+                "default": 100,
+                "type": "number"
+              }
+            }
+          },
+          "攻击力": {
+            "type": "number"
+          },
+          "防御力": {
+            "type": "number"
+          },
+          "特攻": {
+            "type": "number"
+          },
+          "特防": {
+            "type": "number"
+          },
+          "速度": {
+            "type": "number"
+          },
+          "变化形态": {
+            "default": "无",
+            "type": "string",
+            "enum": [
+              "无",
+              "天使化",
+              "恶魔化",
+              "精灵化",
+              "兽人化"
+            ]
+          },
+          "技能": {
+            "default": {},
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "类型": {
+                  "default": "主动",
+                  "type": "string",
+                  "enum": [
+                    "主动",
+                    "被动",
+                    "光环",
+                    "天赋"
+                  ]
+                },
+                "稀有度": {
+                  "default": "普通",
+                  "type": "string",
+                  "enum": [
+                    "普通",
+                    "稀有",
+                    "史诗",
+                    "传说",
+                    "神话"
+                  ]
+                },
+                "元素属性": {
+                  "default": "无",
+                  "type": "string",
+                  "enum": [
+                    "地",
+                    "火",
+                    "水",
+                    "风",
+                    "光",
+                    "暗",
+                    "无"
+                  ]
+                },
+                "消耗MP": {
+                  "type": "number"
+                },
+                "冷却回合": {
+                  "type": "number"
+                },
+                "基础威力": {
+                  "type": "number"
+                },
+                "描述": {
+                  "type": "string"
+                },
+                "效果公式": {
+                  "type": "string"
+                },
+                "数值参数": {
+                  "default": {},
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          },
+          "着装": {
+            "default": {},
+            "type": "object",
+            "properties": {
+              "上装": {
+                "type": "string"
+              },
+              "下装": {
+                "type": "string"
+              },
+              "内衣": {
+                "type": "string"
+              },
+              "鞋袜": {
+                "type": "string"
+              },
+              "饰品": {
+                "type": "string"
+              }
+            }
+          },
+          "战斗衣着": {
+            "type": "string"
+          },
+          "性器状态": {
+            "default": {},
+            "type": "object",
+            "properties": {
+              "胸部": {
+                "default": {},
+                "type": "object",
+                "properties": {
+                  "尺寸": {
+                    "type": "string"
+                  },
+                  "乳头状态": {
+                    "default": "粉嫩",
+                    "type": "string"
+                  },
+                  "开发度": {
+                    "type": "number"
+                  },
+                  "敏感度": {
+                    "default": "普通",
+                    "type": "string",
+                    "enum": [
+                      "迟钝",
+                      "普通",
+                      "敏感",
+                      "过敏",
+                      "淫乱"
+                    ]
+                  },
+                  "当前状态": {
+                    "default": "正常",
+                    "type": "string"
+                  },
+                  "特殊标记": {
+                    "type": "string"
+                  }
+                }
+              },
+              "阴部": {
+                "default": {},
+                "type": "object",
+                "properties": {
+                  "处女膜": {
+                    "default": "完整",
+                    "type": "string",
+                    "enum": [
+                      "完整",
+                      "已破",
+                      "无"
+                    ]
+                  },
+                  "紧致度": {
+                    "default": "紧致",
+                    "type": "string",
+                    "enum": [
+                      "紧致",
+                      "普通",
+                      "松弛",
+                      "松垮"
+                    ]
+                  },
+                  "开发度": {
+                    "type": "number"
+                  },
+                  "敏感度": {
+                    "default": "普通",
+                    "type": "string",
+                    "enum": [
+                      "迟钝",
+                      "普通",
+                      "敏感",
+                      "过敏",
+                      "淫乱"
+                    ]
+                  },
+                  "当前状态": {
+                    "default": "正常",
+                    "type": "string"
+                  },
+                  "特殊标记": {
+                    "type": "string"
+                  }
+                }
+              },
+              "阴蒂": {
+                "default": {},
+                "type": "object",
+                "properties": {
+                  "大小": {
+                    "default": "小巧",
+                    "type": "string",
+                    "enum": [
+                      "隐藏",
+                      "小巧",
+                      "普通",
+                      "突出",
+                      "肥大"
+                    ]
+                  },
+                  "开发度": {
+                    "type": "number"
+                  },
+                  "敏感度": {
+                    "default": "普通",
+                    "type": "string",
+                    "enum": [
+                      "迟钝",
+                      "普通",
+                      "敏感",
+                      "过敏",
+                      "淫乱"
+                    ]
+                  },
+                  "当前状态": {
+                    "default": "正常",
+                    "type": "string"
+                  },
+                  "特殊标记": {
+                    "type": "string"
+                  }
+                }
+              },
+              "后庭": {
+                "default": {},
+                "type": "object",
+                "properties": {
+                  "开发度": {
+                    "type": "number"
+                  },
+                  "紧致度": {
+                    "default": "紧闭",
+                    "type": "string",
+                    "enum": [
+                      "紧闭",
+                      "紧致",
+                      "普通",
+                      "松弛"
+                    ]
+                  },
+                  "敏感度": {
+                    "default": "迟钝",
+                    "type": "string",
+                    "enum": [
+                      "迟钝",
+                      "普通",
+                      "敏感",
+                      "过敏",
+                      "淫乱"
+                    ]
+                  },
+                  "当前状态": {
+                    "default": "正常",
+                    "type": "string"
+                  },
+                  "特殊标记": {
+                    "type": "string"
+                  }
+                }
+              },
+              "子宫": {
+                "default": {},
+                "type": "object",
+                "properties": {
+                  "状态": {
+                    "default": "未开发",
+                    "type": "string",
+                    "enum": [
+                      "未开发",
+                      "轻度开发",
+                      "中度开发",
+                      "完全开发",
+                      "子宫脱垂"
+                    ]
+                  },
+                  "敏感度": {
+                    "default": "迟钝",
+                    "type": "string",
+                    "enum": [
+                      "迟钝",
+                      "普通",
+                      "敏感",
+                      "过敏",
+                      "淫乱"
+                    ]
+                  },
+                  "当前状态": {
+                    "default": "正常",
+                    "type": "string"
+                  },
+                  "特殊标记": {
+                    "type": "string"
+                  }
+                }
+              },
+              "口腔": {
+                "default": {},
+                "type": "object",
+                "properties": {
+                  "技巧": {
+                    "default": "生疏",
+                    "type": "string",
+                    "enum": [
+                      "生疏",
+                      "普通",
+                      "熟练",
+                      "精通",
+                      "大师"
+                    ]
+                  },
+                  "开发度": {
+                    "type": "number"
+                  },
+                  "敏感度": {
+                    "default": "普通",
+                    "type": "string",
+                    "enum": [
+                      "迟钝",
+                      "普通",
+                      "敏感",
+                      "过敏"
+                    ]
+                  },
+                  "深喉适应": {
+                    "default": "无法接受",
+                    "type": "string",
+                    "enum": [
+                      "无法接受",
+                      "勉强",
+                      "适应",
+                      "精通"
+                    ]
+                  },
+                  "当前状态": {
+                    "default": "正常",
+                    "type": "string"
+                  },
+                  "特殊标记": {
+                    "type": "string"
+                  }
+                }
+              },
+              "整体淫乱度": {
+                "type": "number"
+              },
+              "性经验次数": {
+                "type": "number"
+              },
+              "高潮体质": {
+                "default": "普通",
+                "type": "string",
+                "enum": [
+                  "难以高潮",
+                  "普通",
+                  "容易高潮",
+                  "连续高潮体质",
+                  "潮吹体质"
+                ]
+              },
+              "当前性欲": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      }
+    },
+    "战斗控制台": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "进行中": {
+          "type": "boolean"
+        },
+        "己方出战": {
+          "type": "string"
+        },
+        "敌方出战": {
+          "type": "string"
+        },
+        "己方队伍": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "敌方队伍": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "战斗类型": {
+          "default": "普通",
+          "type": "string",
+          "enum": [
+            "普通",
+            "捕获",
+            "BOSS"
+          ]
+        },
+        "敌方训练家信息": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "名字": {
+              "type": "string"
+            },
+            "类型": {
+              "default": "未知",
+              "type": "string",
+              "enum": [
+                "骄傲型",
+                "复仇型",
+                "理智型",
+                "胆小型",
+                "宠爱独占型",
+                "工具使用型",
+                "虐待调教型",
+                "共享轮用型",
+                "展示炫耀型",
+                "洗脑奴化型",
+                "放置忽视型",
+                "未知"
+              ]
+            },
+            "意志状态": {
+              "default": "未知",
+              "type": "string",
+              "enum": [
+                "坚定",
+                "动摇",
+                "崩溃",
+                "未知"
+              ]
+            },
+            "持有捕捉球": {
+              "type": "boolean"
+            },
+            "捕捉球类型": {
+              "default": "普通球",
+              "type": "string",
+              "enum": [
+                "普通球",
+                "高级球",
+                "超级球",
+                "魅惑之球"
+              ]
+            },
+            "捕捉辅助器": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    }
+  }
+}
