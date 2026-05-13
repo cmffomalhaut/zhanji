@@ -127,6 +127,33 @@ function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v));
 }
 
+function calcResistMod(affection?: number, corruption?: number, nature?: string): number {
+  let a = 0;
+  if (affection != null) {
+    if (affection >= 150) a = -0.10;
+    else if (affection >= 100) a = -0.05;
+    else if (affection >= 50) a = 0;
+    else if (affection >= 0) a = 0.05;
+    else if (affection > -50) a = 0.15;
+    else a = 0.25;
+  }
+  let c = 0;
+  if (corruption != null) {
+    if (corruption >= 80) c = -0.05;
+    else if (corruption >= 50) c = 0;
+    else if (corruption >= 20) c = 0.05;
+    else c = 0.10;
+  }
+  let n = 0;
+  if (nature) {
+    const strongWills = ['固执', '勇敢', '大胆', '慎重', '内敛', '冷静', '认真'];
+    const weakWills = ['胆小', '温和', '害羞', '悠闲', '天真'];
+    if (strongWills.includes(nature)) n = 0.05;
+    else if (weakWills.includes(nature)) n = -0.05;
+  }
+  return clamp(a + c + n, 0, 0.35);
+}
+
 function randFloat(min: number, max: number): number {
   return min + Math.random() * (max - min);
 }
@@ -387,9 +414,11 @@ function checkPassives(unit: BattleUnit, trigger: 'on_hit' | 'on_attack' | 'on_l
   return triggered;
 }
 
-function buildStatusMessage(defender: BattleUnit, skill: SkillData, params: SkillParams): string | undefined {
+function buildStatusMessage(defender: BattleUnit, skill: SkillData, params: SkillParams, attacker?: BattleUnit): string | undefined {
   const statusApplied: string[] = [];
   const source = skill.name;
+  const formula = inferFormula(skill);
+  const duration = params.持续回合 ?? 2;
 
   if (params.灼烧概率) {
     const s = tryApplyStatus(defender, 'burn', params.灼烧概率, params.灼烧回合 ?? 3, params.灼烧伤害 ?? 0.05, source);
@@ -418,6 +447,10 @@ function buildStatusMessage(defender: BattleUnit, skill: SkillData, params: Skil
     const s = tryApplyStatus(defender, 'confuse', params.混乱概率, params.混乱回合 ?? 2, 0.35, source);
     if (s) statusApplied.push(s);
   }
+  if (params.流血概率) {
+    const s = tryApplyStatus(defender, 'bleed', params.流血概率, params.流血回合 ?? 3, params.流血伤害 ?? 0.04, source);
+    if (s) statusApplied.push(s);
+  }
 
   const buffMap: [keyof SkillParams, StatusEffectType][] = [
     ['攻击加成', 'atk_up'],
@@ -427,6 +460,7 @@ function buildStatusMessage(defender: BattleUnit, skill: SkillData, params: Skil
     ['速度加成', 'speed_up'],
     ['命中加成', 'acc_up'],
     ['闪避加成', 'eva_up'],
+    ['全属性加成', 'all_up'],
   ];
 
   const debuffMap: [keyof SkillParams, StatusEffectType][] = [
@@ -437,26 +471,23 @@ function buildStatusMessage(defender: BattleUnit, skill: SkillData, params: Skil
     ['速度加成', 'speed_down'],
     ['命中加成', 'acc_down'],
     ['闪避加成', 'eva_down'],
+    ['全属性加成', 'all_down'],
   ];
 
-  const formula = inferFormula(skill);
-  const duration = params.持续回合 ?? 2;
-  if (formula === 'buff') {
-    for (const [key, type] of buffMap) {
-      const v = params[key];
-      if (v && v > 0) {
-        const s = tryApplyStatus(defender, type, 1.0, duration, v, source);
-        if (s) statusApplied.push(s);
-      }
+  for (const [key, type] of buffMap) {
+    const v = params[key];
+    if (v && v > 0) {
+      const target = formula === 'buff' ? defender : (attacker ?? defender);
+      const s = tryApplyStatus(target, type, 1.0, duration, v, source);
+      if (s) statusApplied.push(s);
     }
   }
-  if (formula === 'debuff') {
-    for (const [key, type] of debuffMap) {
-      const v = params[key];
-      if (v && v !== 0) {
-        const s = tryApplyStatus(defender, type, 1.0, duration, Math.abs(v), source);
-        if (s) statusApplied.push(s);
-      }
+  for (const [key, type] of debuffMap) {
+    const v = params[key];
+    if (v && v < 0) {
+      const target = formula === 'debuff' ? defender : (attacker ?? defender);
+      const s = tryApplyStatus(target, type, 1.0, duration, Math.abs(v), source);
+      if (s) statusApplied.push(s);
     }
   }
 
@@ -751,7 +782,7 @@ function executeSkill(
     passiveTriggered.push(...checkPassives(defender, 'on_low_hp'));
   }
 
-  const statusApplied = buildStatusMessage(defender, skill, params);
+  const statusApplied = buildStatusMessage(defender, skill, params, attacker);
 
   const effText =
     effectiveness === 'super'
@@ -805,7 +836,7 @@ export class BattleEngine {
   winner: 'ally' | 'enemy' | 'escape' | null = null;
   escapeAttempts = 0;
   itemUsed = false;
-  consecutiveExtraCount = 0;
+  consecutiveExtraCount: Record<'ally' | 'enemy', number> = { ally: 0, enemy: 0 };
 
   allyFieldBuffs: FieldBuff[] = [];
   enemyFieldBuffs: FieldBuff[] = [];
@@ -1121,12 +1152,14 @@ export class BattleEngine {
     if (!enemyAlive && allyAlive) {
       this.battleOver = true;
       this.winner = 'ally';
+      this.pendingForcedSwitch = null;
       this.addLog('victory', `敌方全员倒下！己方获胜！`);
       return;
     }
     if (!allyAlive && enemyAlive) {
       this.battleOver = true;
       this.winner = 'enemy';
+      this.pendingForcedSwitch = null;
       this.addLog('defeat', `己方全员倒下...战斗失败`);
       return;
     }
@@ -1135,6 +1168,7 @@ export class BattleEngine {
       const allyHp = this.totalTeamHP('ally');
       const enemyHp = this.totalTeamHP('enemy');
       this.battleOver = true;
+      this.pendingForcedSwitch = null;
       this.winner = allyHp >= enemyHp ? 'ally' : 'enemy';
       this.addLog('system', `达到最大回合数(${MAX_ROUNDS})，按剩余总HP判定胜负`);
       this.addLog(
@@ -1147,6 +1181,16 @@ export class BattleEngine {
   private processEndOfTurn(): void {
     for (const t of processStatusEndTurn(this.ally)) this.addLog('status', t.message);
     for (const t of processStatusEndTurn(this.enemy)) this.addLog('status', t.message);
+
+    // 回合结束状态伤害可能导致死亡，需触发强制换人
+    for (const side of ['ally', 'enemy'] as const) {
+      const unit = this.getActive(side);
+      if (this.isDefeated(unit)) {
+        this.addLog('defeat', `${unit.name} 倒下了！`);
+        this.requestForcedSwitch(side, 'defeated');
+        this.resolveEnemyForcedSwitchIfNeeded();
+      }
+    }
 
     // 战斗类型特色：回合结束触发
     for (const unit of [this.ally, this.enemy]) {
@@ -1232,7 +1276,7 @@ export class BattleEngine {
     }
 
     this.round++;
-    this.consecutiveExtraCount = 0;
+    this.consecutiveExtraCount = { ally: 0, enemy: 0 };
     const actions: ActionResult[] = [];
 
     const playerCommand = this.normalizePlayerCommand(playerCommandRaw);
@@ -1409,7 +1453,7 @@ export class BattleEngine {
       if (this.battleOver || this.isDefeated(attacker) || this.pendingForcedSwitch) continue;
 
       if (targetType !== 'single_enemy') continue;
-      if (this.consecutiveExtraCount >= 1) {
+      if (this.consecutiveExtraCount[attackerSide] >= 1) {
         this.addLog('speed', `${attacker.name} 本回合已追加行动，无法再次追加`);
         continue;
       }
@@ -1425,7 +1469,7 @@ export class BattleEngine {
       if (roll > extraChance) continue;
 
       this.addLog('speed', `${attacker.name} 获得速度追加行动！`);
-      this.consecutiveExtraCount++;
+      this.consecutiveExtraCount[attackerSide]++;
       const extraResult = executeSkill(attacker, currentDefender, chosenSkill, attackerField, defenderField);
       extraResult.attackerSide = attackerSide;
       extraResult.defenderSide = defenderSide;
@@ -1578,12 +1622,19 @@ export class BattleEngine {
       statusMod += 0.15;
     }
 
-    const finalRate = clamp(baseRate * ballMultiplier + statusMod, 0, 1);
-    const detailText =
-      `基础率${Math.round(baseRate * 100)}%(${quality}级)` +
-      ` × 球倍率${ballMultiplier}` +
-      (statusMod ? ` +状态${Math.round(statusMod * 100)}%` : '') +
-      ` = 最终${Math.round(finalRate * 100)}%`;
+    const techMod = attempt.useTechAssist ? 0.15 : 0;
+    const resistMod = calcResistMod(attempt.enemyAffection, attempt.enemyCorruption, attempt.enemyNature);
+
+    const finalRate = clamp(baseRate * ballMultiplier + techMod + statusMod - resistMod, 0, 1);
+
+    const parts: string[] = [];
+    parts.push(`基础率${Math.round(baseRate * 100)}%(${quality}级)`);
+    parts.push(`×球${ballMultiplier}`);
+    if (techMod) parts.push(`+道具${Math.round(techMod * 100)}%`);
+    if (statusMod) parts.push(`+状态${Math.round(statusMod * 100)}%`);
+    if (resistMod) parts.push(`-抵抗${Math.round(resistMod * 100)}%`);
+    parts.push(`=最终${Math.round(finalRate * 100)}%`);
+    const detailText = parts.join(' ');
 
     return {
       attempted: false,
@@ -1591,9 +1642,9 @@ export class BattleEngine {
       finalRate,
       baseRate,
       ballMultiplier,
-      techMod: 0,
+      techMod,
       statusMod,
-      resistMod: 0,
+      resistMod,
       detailText,
     };
   }

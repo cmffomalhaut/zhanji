@@ -6,10 +6,10 @@
 // 日常任务模板池 (~20个)
 const DAILY_QUEST_POOL = [
   { name:'实战训练', req:'在虚拟训练平台进行1次战斗', 金币:[80,150], 道具:[{n:'小型经验糖果',q:1}], 标签:['战斗'], icon:'⚔️', filter:(d:any) => hasBattleChar(d) },
-  { name:'基础训练', req:'与任意野生战姬进行1场战斗', 金币:[80,120], 道具:[{n:'初级伤药',q:1}], 标签:['战斗'], icon:'⚔️', filter:(d:any) => hasBattleChar(d) },
+  { name:'基础训练', req:'与任意战姬投影体进行1场战斗', 金币:[80,120], 道具:[{n:'初级伤药',q:1}], 标签:['战斗'], icon:'⚔️', filter:(d:any) => hasBattleChar(d) },
   { name:'连胜挑战', req:'在战斗中取得1次胜利', 金币:[100,150], 道具:[{n:'小型经验糖果',q:1}], 标签:['战斗'], icon:'🏆', filter:(d:any) => hasBattleChar(d) },
   { name:'城市巡游', req:'前往2个不同地点', 金币:[50,100], 道具:[{n:'初级伤药',q:1}], 标签:['探索'], icon:'🗺️', filter:() => true },
-  { name:'物资收集', req:'在探索中发现1个道具或资源点', 金币:[50,100], 道具:[{n:'小型经验糖果',q:1}], 标签:['探索'], icon:'🔍', filter:() => true },
+  { name:'信息收集', req:'前往人员密集场所探查情报', 金币:[50,100], 道具:[{n:'小型经验糖果',q:1}], 标签:['探索'], icon:'🔍', filter:() => true },
   { name:'社交拜访', req:'与1位NPC进行对话互动', 金币:[30,80], 道具:[{n:'迷魂香',q:1}], 标签:['探索'], icon:'💬', filter:() => true },
   { name:'战姬互动', req:'与任意出战战姬进行1次H互动', 金币:[100,200], 道具:[{n:'甜蜜糖果',q:1}], 标签:['养成'], icon:'💕', filter:(d:any) => hasBattleChar(d) },
   { name:'好感培养', req:'通过互动提升任意战姬好感度至少3点', 金币:[80,120], 道具:[{n:'甜蜜糖果',q:1}], 标签:['养成'], icon:'💝', filter:(d:any) => hasBattleChar(d) },
@@ -18,29 +18,28 @@ const DAILY_QUEST_POOL = [
   { name:'技能试炼', req:'在战斗中使用1次战姬技能', 金币:[80,120], 道具:[{n:'技能强化剂',q:1}], 标签:['战斗'], icon:'⚡', filter:(d:any) => hasBattleChar(d) },
   { name:'道具使用', req:'使用1个任意道具', 金币:[30,60], 道具:[{n:'初级伤药',q:1}], 标签:['探索'], icon:'🧪', filter:() => true },
   { name:'装备整理', req:'检查并调整1位战姬的着装', 金币:[30,60], 道具:[{n:'迷魂香',q:1}], 标签:['养成'], icon:'👗', filter:(d:any) => hasBattleChar(d) },
-  { name:'切磋交流', req:'与1位其他训练家进行友好切磋', 金币:[100,150], 道具:[{n:'普通捕捉球',q:1}], 标签:['战斗'], icon:'🤺', filter:(d:any) => hasBattleChar(d) },
+  { name:'切磋交流', req:'与1位其他训练家进行战斗', 金币:[100,150], 道具:[{n:'普通捕捉球',q:1}], 标签:['战斗'], icon:'🤺', filter:(d:any) => hasBattleChar(d) },
   { name:'野外探索', req:'前往野外区域进行探索', 金币:[50,100], 道具:[{n:'小型经验糖果',q:1}], 标签:['探索'], icon:'🌲', filter:() => true },
   { name:'据点打理', req:'维护据点设施（检查收藏室或工作区）', 金币:[50,100], 道具:[{n:'小型经验糖果',q:1}], 标签:['探索'], icon:'🏰', filter:(d:any) => isBaseUnlocked(d) },
-  { name:'商店采购', req:'在商店购买任意1个道具', 金币:[30,60], 道具:[{n:'普通捕捉球',q:1}], 标签:['探索'], icon:'🛒', filter:() => true },
-  { name:'情报收集', req:'打探当地关于野生战姬的情报', 金币:[30,60], 道具:[{n:'初级伤药',q:1}], 标签:['探索'], icon:'📋', filter:() => true },
+  { name:'情报收集', req:'打探当地奇怪事情的情报', 金币:[30,60], 道具:[{n:'初级伤药',q:1}], 标签:['探索'], icon:'📋', filter:() => true },
   { name:'日常巡逻', req:'在当前区域巡逻一次', 金币:[50,80], 道具:[{n:'初级伤药',q:1}], 标签:['探索'], icon:'🚶', filter:() => true },
 ];
 
 // 周常任务模板池 (~15个)
 const WEEKLY_QUEST_POOL = [
   { name:'连战连胜', req:'本周内取得3场战斗胜利', 金币:[300,500], 道具:[{n:'高级伤药',q:1},{n:'中型经验糖果',q:2}], 标签:['战斗'], icon:'⚔️', filter:(d:any) => hasBattleChar(d) },
-  { name:'精英讨伐', req:'击败1名拥有B级以上战姬的训练家', 金币:[400,600], 道具:[{n:'大型经验糖果',q:1}], 标签:['战斗'], icon:'💀', filter:(d:any) => hasBattleChar(d) && getMaxLevel(d) >= 8 },
+  { name:'精英讨伐', req:'击败1名拥有C级以上战姬的训练家', 金币:[400,600], 道具:[{n:'大型经验糖果',q:1}], 标签:['战斗'], icon:'💀', filter:(d:any) => hasBattleChar(d) && getMaxLevel(d) >= 8 },
   { name:'战姬捕获', req:'使用捕捉球成功捕获1只野生战姬', 金币:[300,500], 道具:[{n:'高级捕捉球',q:2}], 标签:['捕获'], icon:'🎯', filter:(d:any) => hasAnyBall(d) },
   { name:'稀有猎手', req:'捕获1只C级或以上品质的战姬', 金币:[500,800], 道具:[{n:'超级捕捉球',q:1}], 标签:['捕获'], icon:'💎', filter:(d:any) => hasAnyBall(d) && getMaxLevel(d) >= 10 },
   { name:'战姬培养', req:'让任意战姬升3级', 金币:[300,500], 道具:[{n:'大型经验糖果',q:2}], 标签:['养成'], icon:'📈', filter:(d:any) => hasBattleChar(d) },
-  { name:'好感突破', req:'将任意战姬好感度提升至100以上', 金币:[400,600], 道具:[{n:'挚爱糖果',q:1}], 标签:['养成'], icon:'💕', filter:(d:any) => hasBattleChar(d) },
+  { name:'好感突破', req:'将任意战姬好感度提升至80以上', 金币:[400,600], 道具:[{n:'挚爱糖果',q:1}], 标签:['养成'], icon:'💕', filter:(d:any) => hasBattleChar(d) },
   { name:'技能掌握', req:'让任意战姬学会1个新技能', 金币:[500,700], 道具:[{n:'稀有技能学习机',q:1}], 标签:['养成'], icon:'📚', filter:(d:any) => hasBattleChar(d) },
   { name:'据点建设', req:'升级1次据点设施（收藏室或工作区）', 金币:[400,600], 道具:[{n:'高级融合催化剂',q:1}], 标签:['养成'], icon:'🏗️', filter:(d:any) => isBaseUnlocked(d) },
   { name:'融合实验', req:'尝试进行1次战姬融合', 金币:[500,700], 道具:[{n:'高级融合保护剂',q:1}], 标签:['融合'], icon:'🔮', filter:(d:any) => hasMultipleChars(d) },
-  { name:'秘境探索', req:'发现并探索1处秘境', 金币:[500,800], 道具:[{n:'高级相性提升剂',q:1}], 标签:['秘境'], icon:'🌌', filter:(d:any) => getMaxLevel(d) >= 8 },
-  { name:'打工赚钱', req:'让战姬在工作区服役累计获得金币', 金币:[200,400], 道具:[{n:'中级经验糖果',q:3}], 标签:['养成'], icon:'💰', filter:(d:any) => isWorkAreaUnlocked(d) },
+  { name:'秘境探索', req:'探索1处秘境', 金币:[500,800], 道具:[{n:'高级相性提升剂',q:1}], 标签:['秘境'], icon:'🌌', filter:(d:any) => getMaxLevel(d) >= 8 },
+  { name:'打工赚钱', req:'让战姬在工作区服役', 金币:[200,400], 道具:[{n:'中级经验糖果',q:3}], 标签:['养成'], icon:'💰', filter:(d:any) => isWorkAreaUnlocked(d) },
   { name:'社交达人', req:'与3位不同NPC建立良好关系', 金币:[300,500], 道具:[{n:'甜蜜糖果',q:3}], 标签:['探索'], icon:'🤝', filter:() => true },
-  { name:'收藏扩充', req:'将收藏室中的战姬数量增加到容量的一半以上', 金币:[300,500], 道具:[{n:'大型经验糖果',q:1}], 标签:['养成'], icon:'📦', filter:(d:any) => isBaseUnlocked(d) && hasBattleChar(d) },
+  { name:'收藏扩充', req:'增加收藏室中的战姬', 金币:[300,500], 道具:[{n:'大型经验糖果',q:1}], 标签:['养成'], icon:'📦', filter:(d:any) => isBaseUnlocked(d) && hasBattleChar(d) },
   { name:'竞技挑战', req:'参加1场正式的训练家对战', 金币:[400,600], 道具:[{n:'技能强化剂',q:2}], 标签:['战斗'], icon:'🏟️', filter:(d:any) => hasBattleChar(d) && getMaxLevel(d) >= 5 },
   { name:'探险远征', req:'前往1个新的城镇或特殊地点', 金币:[300,500], 道具:[{n:'高级捕捉球',q:1}], 标签:['探索'], icon:'🧭', filter:() => true },
 ];
@@ -157,39 +156,7 @@ $(() => {
 
     eventOn(Mvu.events.VARIABLE_UPDATE_ENDED, (newVars: any, oldVars: any) => {
       const newData = _.get(newVars, 'stat_data', {});
-      const oldData = _.get(oldVars, 'stat_data', {});
-
-      // ====== 检测已完成任务并发放奖励 ======
-      const oldTasks = oldData.任务列表 || {};
-      const newTasks = newData.任务列表 || {};
       const rewardMap = newData._任务奖励映射 || {};
-
-      for (const taskId of Object.keys(oldTasks)) {
-        const oldTask = oldTasks[taskId];
-        const newTask = newTasks[taskId];
-        // 任务在本次更新中被标记为已完成（或在旧数据中存在但新数据中被schema清除）
-        if (oldTask && !oldTask.已完成) {
-          const isCompleted = (newTask && newTask.已完成) || (!newTask); // !newTask 说明被schema清除了
-          if (isCompleted) {
-            const reward = rewardMap[taskId];
-            if (reward) {
-              giveReward(newVars, reward);
-              console.info(`[任务系统] ✅ 完成任务 [${oldTask.名称}], 发放奖励:`, reward);
-              // 清理奖励映射
-              delete rewardMap[taskId];
-            } else {
-              console.info(`[任务系统] ⚠️ 任务 [${oldTask.名称}] 完成但无奖励映射，跳过`);
-            }
-          }
-        }
-      }
-
-      // ====== 清理过期的奖励映射 ======
-      for (const taskId of Object.keys(rewardMap)) {
-        if (!newTasks[taskId] && !oldTasks[taskId]) {
-          delete rewardMap[taskId];
-        }
-      }
 
       // ====== 检测日期变化 → 刷新任务 ======
       const currentDate = _.get(newData, '世界.日期', '');
@@ -224,9 +191,31 @@ $(() => {
             _type: '日常任务',
             金币: randomInRange(tmpl.金币[0], tmpl.金币[1]),
             道具: tmpl.道具.map((item:any) => ({ 名称: item.n, 数量: item.q })),
+            经验值: randomInRange(200, 600),
           };
         });
         console.info(`[任务系统] 已刷新 ${selected.length} 个日常任务`);
+      }
+
+      // ====== 补缺：当天无日常任务时自动生成 ======
+      if (currentDate && currentDate === lastProcessedDate) {
+        const hasDailyToday = Object.keys(newData.任务列表 || {}).some(id => id.startsWith(`日常_${currentDate}_`));
+        if (!hasDailyToday) {
+          const currentQuests = Object.values(newData.任务列表 || {}).map((t:any) => t.名称);
+          const selected = generateQuests(DAILY_QUEST_POOL, 3, newData, currentQuests);
+          selected.forEach((tmpl, i) => {
+            const taskId = `日常_${currentDate}_${i+1}`;
+            const task = buildTaskObject(tmpl, taskId, '日常任务', currentDate);
+            _.set(newData, `任务列表.${taskId}`, task);
+            rewardMap[taskId] = {
+              _type: '日常任务',
+              金币: randomInRange(tmpl.金币[0], tmpl.金币[1]),
+              道具: tmpl.道具.map((item:any) => ({ 名称: item.n, 数量: item.q })),
+              经验值: randomInRange(200, 600),
+            };
+          });
+          console.info(`[任务系统] 补充生成 ${selected.length} 个日常任务`);
+        }
       }
 
       // ====== 周一刷新周常 ======
@@ -258,6 +247,7 @@ $(() => {
             _type: '周常任务',
             金币: randomInRange(tmpl.金币[0], tmpl.金币[1]),
             道具: tmpl.道具.map((item:any) => ({ 名称: item.n, 数量: item.q })),
+            经验值: randomInRange(200, 600),
           };
         });
         console.info(`[任务系统] 已刷新 ${selected.length} 个周常任务`);
@@ -267,25 +257,6 @@ $(() => {
       _.set(newVars, 'stat_data._任务奖励映射', rewardMap);
       _.set(newData, '世界._任务上次刷新日期', currentDate);
     });
-
-    // ====== 奖励发放 ======
-    function giveReward(variables: any, reward: any) {
-      // 加金币
-      const oldGold = _.get(variables, 'stat_data.金币', 0);
-      _.set(variables, 'stat_data.金币', oldGold + (reward.金币 || 0));
-
-      // 加道具
-      if (reward.道具) {
-        for (const item of reward.道具) {
-          const key = `stat_data.背包.${item.名称}`;
-          const oldQty = _.get(variables, `${key}.数量`, 0);
-          _.set(variables, key, {
-            描述: item.名称,
-            数量: oldQty + item.数量,
-          });
-        }
-      }
-    }
 
     // 记录初始状态
     const initVars = Mvu.getMvuData({ type: 'message', message_id: -1 });

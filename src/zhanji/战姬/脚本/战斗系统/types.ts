@@ -127,6 +127,9 @@ export type UnitQuality = 'E' | 'D' | 'C' | 'B' | 'A' | 'S';
 /** 战斗单位 */
 export interface BattleUnit {
   name: string;
+  性格?: string;
+  好感度?: number;
+  堕落值?: number;
   等级: number;
   稀有度?: string;
   品质?: UnitQuality;
@@ -277,6 +280,14 @@ export interface CaptureAttempt {
   ballType: CaptureballType;
   /** 训练师技能加成（如 0.15 = +15%） */
   trainerSkillBonus?: number;
+  /** 是否使用捕捉辅助器道具 (+15%) */
+  useTechAssist?: boolean;
+  /** 敌方好感度（用于抵抗修正） */
+  enemyAffection?: number;
+  /** 敌方堕落值（用于抵抗修正） */
+  enemyCorruption?: number;
+  /** 敌方性格（用于抵抗修正） */
+  enemyNature?: string;
 }
 
 /** 捕捉球库存项 */
@@ -369,8 +380,8 @@ export interface EnemyTrainerProfile {
 /** 战斗控制台 MVU 变量结构 */
 export interface BattleConsole {
   进行中: boolean;
-  己方出战: string;
-  敌方出战: string;
+  己方出战: string | string[];
+  敌方出战: string | string[];
   己方队伍?: string[];
   敌方队伍?: string[];
   战斗类型: '普通' | '捕获' | 'BOSS';

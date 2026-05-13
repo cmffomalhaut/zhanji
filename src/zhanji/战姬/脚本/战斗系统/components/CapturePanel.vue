@@ -48,6 +48,14 @@
             <span class="preview-label">球倍率</span>
             <span class="preview-value accent">×{{ preview.ballMultiplier.toFixed(1) }}</span>
           </div>
+          <div v-if="preview.techMod > 0" class="preview-row">
+            <span class="preview-label">道具加成</span>
+            <span class="preview-value buff">+{{ pct(preview.techMod) }}</span>
+          </div>
+          <div v-if="preview.resistMod > 0" class="preview-row">
+            <span class="preview-label">抵抗修正</span>
+            <span class="preview-value debuff">-{{ pct(preview.resistMod) }}</span>
+          </div>
           <div v-if="preview.statusMod > 0" class="preview-row">
             <span class="preview-label">状态加成</span>
             <span class="preview-value buff">+{{ pct(preview.statusMod) }}</span>

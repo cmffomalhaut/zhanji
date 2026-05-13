@@ -204,7 +204,7 @@
               "type": "boolean"
             },
             "解锁条件": {
-              "default": "训练家等级达到Lv.5",
+              "default": "训练家等级达到Lv.2",
               "type": "string"
             },
             "收藏室": {

@@ -76,13 +76,13 @@ export function escapeAnimation(actorId: string, actorSide: 'ally' | 'enemy'): A
 }
 
 export const ANIM_DURATION: Record<AnimType, number> = {
-  single_attack: 600,
+  single_attack: 700,
   group_attack: 800,
-  group_buff: 700,
-  group_heal: 900,
-  single_heal: 800,
-  single_buff: 600,
-  apply_status: 600,
-  defend: 400,
-  escape: 350,
+  group_buff: 500,
+  group_heal: 700,
+  single_heal: 550,
+  single_buff: 400,
+  apply_status: 400,
+  defend: 300,
+  escape: 250,
 };

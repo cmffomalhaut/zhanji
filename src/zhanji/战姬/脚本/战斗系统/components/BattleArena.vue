@@ -1,16 +1,15 @@
 <template>
   <div class="battle-arena battle-arena-1v1">
-    <!-- Enemy slot -->
     <div class="arena-col enemy-col-single">
       <div class="arena-slot"
         :class="enemySlotClass"
         @click="onClick(enemyUnit, 'enemy')">
         <template v-if="enemyUnit && enemyUnit.HP > 0">
-          <div class="arena-orb enemy-orb" :class="orbAnimClass(enemyUnit.name)">
-            <span class="arena-orb-char">{{ enemyUnit.name.charAt(0) }}</span>
+          <div class="stickfig-wrap" :class="[stickAnimClass(enemyUnit.name)]">
+            <div class="stickfig-name">{{ enemyUnit.name }}</div>
+            <img class="chara-fig" :src="portraitUrl(enemyUnit, 'enemy')" alt="" aria-hidden="true"/>
           </div>
           <div class="arena-body">
-            <div class="arena-name">{{ enemyUnit.name }}</div>
             <div class="arena-hp-mini">
               <div class="arena-hp-track"><div class="arena-hp-fill enemy" :style="{ width: hpWidth(enemyUnit) }"></div></div>
               <span class="arena-hp-text">{{ Math.max(0, enemyUnit.HP) }}/{{ enemyUnit.HPMax }}</span>
@@ -22,26 +21,26 @@
           </div>
         </template>
         <template v-else>
-          <div class="arena-orb empty-orb"></div>
+          <div class="stickfig-wrap dead-fig">
+            <img class="chara-fig" :src="portraitUrl(enemyUnit, 'enemy')" alt="" aria-hidden="true"/>
+          </div>
           <div class="arena-body"><div class="arena-name dead-name">—</div></div>
         </template>
       </div>
     </div>
 
-    <!-- VS divider -->
     <div class="arena-vs">VS</div>
 
-    <!-- Ally slot -->
     <div class="arena-col ally-col-single">
       <div class="arena-slot"
         :class="allySlotClass"
         @click="onClick(allyUnit, 'ally')">
         <template v-if="allyUnit && allyUnit.HP > 0">
-          <div class="arena-orb ally-orb" :class="orbAnimClass(allyUnit.name)">
-            <span class="arena-orb-char">{{ allyUnit.name.charAt(0) }}</span>
+          <div class="stickfig-wrap" :class="[stickAnimClass(allyUnit.name)]">
+            <div class="stickfig-name">{{ allyUnit.name }}</div>
+            <img class="chara-fig" :src="portraitUrl(allyUnit, 'ally')" alt="" aria-hidden="true"/>
           </div>
           <div class="arena-body">
-            <div class="arena-name">{{ allyUnit.name }}</div>
             <div class="arena-hp-mini">
               <div class="arena-hp-track"><div class="arena-hp-fill ally" :style="{ width: hpWidth(allyUnit) }"></div></div>
               <span class="arena-hp-text">{{ Math.max(0, allyUnit.HP) }}/{{ allyUnit.HPMax }}</span>
@@ -53,7 +52,9 @@
           </div>
         </template>
         <template v-else>
-          <div class="arena-orb empty-orb"></div>
+          <div class="stickfig-wrap dead-fig">
+            <img class="chara-fig" :src="portraitUrl(allyUnit, 'ally')" alt="" aria-hidden="true"/>
+          </div>
           <div class="arena-body"><div class="arena-name dead-name">—</div></div>
         </template>
       </div>
@@ -65,6 +66,7 @@
 import { computed } from 'vue';
 import type { BattleUnit, StatusEffectType } from '../types';
 import type { AnimEvent } from '../anim';
+import { getPortraitUrl } from '../battle-assets';
 
 const DEBUFF_TYPES: StatusEffectType[] = ['burn', 'poison', 'freeze', 'paralyze', 'confuse'];
 
@@ -81,6 +83,11 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'select', unit: { name: string; side: 'ally' | 'enemy'; isAlive: boolean }): void;
 }>();
+
+function portraitUrl(unit: BattleUnit | null, side: 'ally' | 'enemy'): string {
+  if (!unit) return '';
+  return getPortraitUrl(unit.name, unit.性格, side);
+}
 
 function statusList(u: BattleUnit): Array<{ key: string; tone: string }> {
   return u.statusEffects.map(eff => ({
@@ -137,7 +144,7 @@ function allySlotClass(): Record<string, boolean> {
   return cls;
 }
 
-function orbAnimClass(unitName: string): string {
+function stickAnimClass(unitName: string): string {
   if (!props.anim) return '';
   if (unitName === isActor.value) {
     const t = props.anim.type;

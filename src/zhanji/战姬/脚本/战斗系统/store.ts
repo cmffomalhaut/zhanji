@@ -63,6 +63,8 @@ export const useBattleStore = defineStore('battle', () => {
   const engine = shallowRef<BattleEngine | null>(null);
   const phase = ref<BattlePhase>('idle');
   const battleType = ref<BattleConsole['战斗类型']>('普通');
+  const location = ref<string>('');
+  const hasTechAssist = ref(false);
 
   const ally = ref<BattleUnit | null>(null);
   const enemy = ref<BattleUnit | null>(null);
@@ -83,6 +85,7 @@ export const useBattleStore = defineStore('battle', () => {
   const usedItemName = ref<string | null>(null);
 
   const captureBalls = ref<CaptureBallItem[]>([]);
+  const enemyEscapedDuringCapture = ref(false);
 
   const initAllyData = shallowRef<BattleUnit[] | null>(null);
   const initEnemyData = shallowRef<BattleUnit[] | null>(null);
@@ -184,6 +187,7 @@ export const useBattleStore = defineStore('battle', () => {
     capturePreview.value = null;
     captureBallsUsed.value = [];
     captureBalls.value = [...balls];
+    enemyEscapedDuringCapture.value = false;
 
     phase.value = items.length > 0 ? 'item_select' : 'selecting';
     e.planEnemyAction();
@@ -284,12 +288,14 @@ export const useBattleStore = defineStore('battle', () => {
   /** 玩家选球后预览捕捉率 */
   function previewCapture(attempt: CaptureAttempt) {
     if (!engine.value) return;
-    capturePreview.value = engine.value.buildCapturePreview(attempt);
+    const enriched = enrichCaptureAttempt(attempt);
+    capturePreview.value = engine.value.buildCapturePreview(enriched);
   }
 
   function rollCapture(attempt: CaptureAttempt) {
     if (!engine.value || !capturePreview.value) return;
-    const preview = engine.value.buildCapturePreview(attempt);
+    const enriched = enrichCaptureAttempt(attempt);
+    const preview = engine.value.buildCapturePreview(enriched);
     const diceRoll = Math.floor(Math.random() * 100) + 1;
     const rolled = engine.value.rollCapture(preview, diceRoll);
     capturePreview.value = rolled;
@@ -315,24 +321,39 @@ export const useBattleStore = defineStore('battle', () => {
       const escaped = engine.value.tryEnemyEscapeAfterFail();
       syncFromEngine();
       if (escaped) {
-        finalResult.value = { ...engine.value.getResult(battleType.value), capture: rolled, enemyEscaped: true };
-        phase.value = 'result';
+        enemyEscapedDuringCapture.value = true;
       }
     }
   }
 
   function skipCapture() {
-    finalResult.value = engine.value?.getResult(battleType.value) ?? null;
+    finalResult.value = {
+      ...(engine.value?.getResult(battleType.value) ?? {}),
+      ...(capturePreview.value?.attempted ? { capture: capturePreview.value } : {}),
+      ...(enemyEscapedDuringCapture.value ? { enemyEscaped: true } : {}),
+    } as BattleResult;
     phase.value = 'result';
   }
 
   function resetCapturePreview() {
     capturePreview.value = null;
+    enemyEscapedDuringCapture.value = false;
   }
 
-  /** 敌方自动捕捉检定（我方战败时触发） */
+  function enrichCaptureAttempt(attempt: CaptureAttempt): CaptureAttempt {
+    return {
+      ...attempt,
+      useTechAssist: hasTechAssist.value,
+      enemyAffection: enemy.value?.好感度,
+      enemyCorruption: enemy.value?.堕落值,
+      enemyNature: enemy.value?.性格,
+    };
+  }
+
+  /** 敌方自动捕捉检定（我方战败时触发）——仅训练家战有效 */
   function tryEnemyAutoCapture() {
     if (!engine.value) return;
+    if (battleType.value === '捕获') return;
     const { preview, ballType } = engine.value.buildEnemyCaptureAlly();
     const diceRoll = Math.floor(Math.random() * 100) + 1;
     const rolled = { ...preview, attempted: true, diceRoll, success: diceRoll === 1 ? preview.sRankHardLock && diceRoll === 1 ? true : false : diceRoll / 100 <= preview.finalRate };
@@ -351,6 +372,8 @@ export const useBattleStore = defineStore('battle', () => {
     engine,
     phase,
     battleType,
+    location,
+    hasTechAssist,
     ally,
     enemy,
     allyTeam,

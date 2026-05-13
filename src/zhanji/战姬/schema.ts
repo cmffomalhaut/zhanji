@@ -184,7 +184,7 @@ const WorkAreaSchema = z.object({
 
 const BaseSystemSchema = z.object({
   已解锁: z.boolean().prefault(false),
-  解锁条件: z.string().prefault('训练家等级达到Lv.5'),
+  解锁条件: z.string().prefault('训练家等级达到Lv.2'),
   收藏室: CollectionRoomSchema,
   工作区: WorkAreaSchema
 }).prefault({});
@@ -372,7 +372,7 @@ export const Schema = z.object({
     天气: z.string().prefault('晴'),
     近期事务: z.string().prefault('无'),
     _上次结算日期: z.string().prefault('2022年5月8日'),
-    _任务上次刷新日期: z.string().prefault('')
+    _任务上次刷新日期: z.string().prefault(''),
   }).prefault({}),
   金币: z.coerce.number().prefault(0),
   训练家: TrainerSchema,
@@ -385,7 +385,7 @@ export const Schema = z.object({
   任务列表: z.record(z.string(), TaskSchema)
     .transform(tasks => {
       return _.pickBy(tasks, (task, taskId) => {
-        if (task.已完成 || task.已过期) return false;
+        if (task.已过期) return false;
         if (!task.名称 || task.名称.trim() === '') return false;
         if (!taskId || taskId.trim() === '') return false;
         return true;
@@ -407,10 +407,35 @@ export const Schema = z.object({
     trainer.等级 = trainerLevelInfo.level;
     trainer.经验值.升级所需值 = trainerLevelInfo.maxExp;
 
-    if (trainer.等级 >= 5 && !trainer.据点.已解锁) {
+    if (trainer.等级 >= 2 && !trainer.据点.已解锁) {
       trainer.据点.已解锁 = true;
       // 据点解锁后自动解锁收藏室
       trainer.据点.收藏室.已解锁 = true;
+
+      // 添加剧情任务：据点扩建
+      const questId = '剧情_据点扩建';
+      if (!data.任务列表[questId]) {
+        data.任务列表[questId] = {
+          名称: '据点扩建',
+          要求: '完成三次战姬捕获',
+          奖励: '解锁工作区',
+          类型: '剧情任务',
+          期限: '无',
+          已完成: false,
+          已过期: false,
+          进度: '0/3',
+          标签: ['剧情'],
+          优先级: '高',
+          图标: '🏗️',
+          发布者: '系统',
+          背景色: '',
+        };
+        data._任务奖励映射 = data._任务奖励映射 || {};
+        data._任务奖励映射[questId] = {
+          _type: '剧情任务',
+          解锁: '工作区',
+        };
+      }
     }
 
     // 收藏室计算

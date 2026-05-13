@@ -8,6 +8,7 @@ import { createApp } from 'vue';
 import App from './App.vue';
 import './global.css';
 import { useBattleStore } from './store';
+import { resetPortraitPool } from './battle-assets';
 import type {
   BattleConsole,
   BattleItem,
@@ -81,6 +82,9 @@ function extractBattleUnit(name: string, charData: Record<string, any>): BattleU
 
   return {
     name,
+    性格: charData.性格,
+    好感度: Number(charData.好感度) || 0,
+    堕落值: Number(charData.堕落值) || 0,
     等级: Number(charData.等级) || 1,
     稀有度: charData.稀有度,
     品质: charData.品质,
@@ -91,9 +95,9 @@ function extractBattleUnit(name: string, charData: Record<string, any>): BattleU
     特攻: Number(charData.特攻) || 10,
     特防: Number(charData.特防) || 10,
     速度: Number(charData.速度) || 10,
-    HP: Number(charData.生命值?.当前值) || 100,
+    HP: Number(charData.生命值?.最大值) || 100,
     HPMax: Number(charData.生命值?.最大值) || 100,
-    MP: Number(charData.法力值?.当前值) || 50,
+    MP: Number(charData.法力值?.最大值) || 50,
     MPMax: Number(charData.法力值?.最大值) || 50,
     shield: Number(charData.护盾?.当前值) || 0,
     shieldMax: Number(charData.护盾?.最大值) || 0,
@@ -145,9 +149,10 @@ function extractBattleItems(statData: Record<string, any>): BattleItem[] {
 }
 
 function buildTeamNames(consoleData: BattleConsole, side: 'ally' | 'enemy'): string[] {
-  const main = side === 'ally' ? consoleData.己方出战 : consoleData.敌方出战;
+  const rawMain = side === 'ally' ? consoleData.己方出战 : consoleData.敌方出战;
+  const parts = Array.isArray(rawMain) ? rawMain : (typeof rawMain === 'string' ? rawMain.split(/[,，、]/) : []);
   const list = (side === 'ally' ? consoleData.己方队伍 : consoleData.敌方队伍) ?? [];
-  const merged = [main, ...list].filter(Boolean);
+  const merged = [...parts, ...list].filter(Boolean).map(s => s.trim());
   return [...new Set(merged)].slice(0, 3);
 }
 
@@ -450,6 +455,7 @@ let battleEnemyTeamNames: string[] = [];
 function startBattle(messageId: number) {
   const variables = Mvu.getMvuData({ type: 'message', message_id: messageId });
   const statData = _.get(variables, 'stat_data', {});
+  const globalStatData = _.get(Mvu.getMvuData({ type: 'global' }), 'stat_data', {}) ?? {};
   const consoleData: BattleConsole = _.get(statData, '战斗控制台', {}) as BattleConsole;
 
   if (!consoleData.进行中) return;
@@ -457,13 +463,17 @@ function startBattle(messageId: number) {
   const allyNames = buildTeamNames(consoleData, 'ally');
   const enemyNames = buildTeamNames(consoleData, 'enemy');
 
+  function resolveCharData(name: string): Record<string, any> | undefined {
+    return _.get(statData, `角色数据.${name}`) ?? _.get(globalStatData, `角色数据.${name}`);
+  }
+
   const allyUnits = allyNames
-    .map(name => ({ name, data: _.get(statData, `角色数据.${name}`) }))
+    .map(name => ({ name, data: resolveCharData(name) }))
     .filter(x => !!x.data)
     .map(x => extractBattleUnit(x.name, x.data));
 
   const enemyUnits = enemyNames
-    .map(name => ({ name, data: _.get(statData, `角色数据.${name}`) }))
+    .map(name => ({ name, data: resolveCharData(name) }))
     .filter(x => !!x.data)
     .map(x => extractBattleUnit(x.name, x.data));
 
@@ -476,11 +486,15 @@ function startBattle(messageId: number) {
   battleAllyTeamNames = allyUnits.map(x => x.name);
   battleEnemyTeamNames = enemyUnits.map(x => x.name);
 
-  const items = extractBattleItems(statData);
-  const balls = extractCaptureBalls(statData);
+  const mergedStat = { ...globalStatData, ...statData };
+  const items = extractBattleItems(mergedStat);
+  const balls = extractCaptureBalls(mergedStat);
+  const location = _.get(mergedStat, '世界.地点', '') as string;
+  const trainerEquip = _.get(mergedStat, '训练家.特殊装备', []) as Array<{ 名称?: string }>;
+  const hasTechAssist = trainerEquip.some(e => e.名称?.includes('捕捉辅助器'));
   console.info(`[战斗系统] 开始战斗: [${battleAllyTeamNames.join(', ')}] vs [${battleEnemyTeamNames.join(', ')}]`);
 
-  createBattleIframe(allyUnits, enemyUnits, consoleData.战斗类型, items, balls, consoleData.敌方训练家信息);
+  createBattleIframe(allyUnits, enemyUnits, consoleData.战斗类型, items, balls, consoleData.敌方训练家信息, location, hasTechAssist);
 }
 
 function createBattleIframe(
@@ -490,7 +504,10 @@ function createBattleIframe(
   items: BattleItem[],
   balls: CaptureBallItem[],
   enemyTrainerInfo?: BattleConsole['敌方训练家信息'],
+  location?: string,
+  hasTechAssist?: boolean,
 ) {
+  resetPortraitPool();
   if ($iframe) destroyBattle();
 
   $iframe = createScriptIdIframe()
@@ -516,6 +533,8 @@ function createBattleIframe(
 
       const store = useBattleStore(pinia);
       store.initBattle(allyUnits, enemyUnits, type, items, balls, enemyTrainerInfo);
+      store.location = location ?? '';
+      if (hasTechAssist) store.hasTechAssist = true;
 
       store.registerOnBattleEnd(async (result: BattleResult) => {
         await writeBattleResult(battleAllyTeamNames, battleEnemyTeamNames, result, battleMessageId, store.usedItemName, store.captureBallsUsed);
@@ -584,8 +603,8 @@ function debugStartBattle() {
         { name: '破军斩', 类型: '主动', 稀有度: '普通', 元素属性: '火', 消耗MP: 10, 冷却回合: 0, 基础威力: 60, 描述: '烈焰附着的斩击', 效果公式: 'physical_damage', 目标类型: 'single_enemy', 数值参数: { 命中率: 0.95 } },
         { name: '横扫八方', 类型: '主动', 稀有度: '稀有', 元素属性: '火', 消耗MP: 25, 冷却回合: 3, 基础威力: 45, 描述: '横扫全体敌人', 效果公式: 'physical_damage', 目标类型: 'all_enemies', 数值参数: { 命中率: 0.9 } },
         { name: '嗜血刃', 类型: '主动', 稀有度: '稀有', 元素属性: '暗', 消耗MP: 20, 冷却回合: 3, 基础威力: 50, 描述: '吸取敌方生命', 效果公式: 'drain_physical', 目标类型: 'single_enemy', 数值参数: { 命中率: 0.95 } },
-        { name: '战吼', 类型: '主动', 稀有度: '稀有', 元素属性: '无', 消耗MP: 15, 冷却回合: 4, 基础威力: 0, 描述: '提升自身攻击', 效果公式: 'buff', 目标类型: 'self', 数值参数: { 攻击力加成: 2, 持续回合: 3 } },
-        { name: '碎甲击', 类型: '主动', 稀有度: '稀有', 元素属性: '地', 消耗MP: 15, 冷却回合: 3, 基础威力: 30, 描述: '降低敌方防御', 效果公式: 'debuff', 目标类型: 'single_enemy', 数值参数: { 防御力降低: 2, 持续回合: 3, 命中率: 0.9 } },
+        { name: '战吼', 类型: '主动', 稀有度: '稀有', 元素属性: '无', 消耗MP: 15, 冷却回合: 4, 基础威力: 0, 描述: '提升自身攻击', 效果公式: 'buff', 目标类型: 'self', 数值参数: { 攻击加成: 2, 持续回合: 3 } },
+        { name: '碎甲击', 类型: '主动', 稀有度: '稀有', 元素属性: '地', 消耗MP: 15, 冷却回合: 3, 基础威力: 30, 描述: '降低敌方防御并可能造成流血', 效果公式: 'debuff', 目标类型: 'single_enemy', 数值参数: { 防御加成: 2, 持续回合: 3, 命中率: 0.9, 流血概率: 0.45, 流血回合: 3, 流血伤害: 0.05 } },
         { name: '绝杀突刺', 类型: '主动', 稀有度: '史诗', 元素属性: '火', 消耗MP: 35, 冷却回合: 5, 基础威力: 110, 描述: '高暴击的致命一击', 效果公式: 'physical_damage', 目标类型: 'single_enemy', 数值参数: { 命中率: 0.85, 暴击率加成: 0.2 } },
       ],
       passives: [],
@@ -601,7 +620,7 @@ function debugStartBattle() {
         { name: '风刃术', 类型: '主动', 稀有度: '普通', 元素属性: '风', 消耗MP: 12, 冷却回合: 0, 基础威力: 55, 描述: '风之刃攻击', 效果公式: 'magic_damage', 目标类型: 'single_enemy', 数值参数: { 命中率: 0.9 } },
         { name: '清风愈', 类型: '主动', 稀有度: '稀有', 元素属性: '风', 消耗MP: 22, 冷却回合: 3, 基础威力: 0, 描述: '恢复友方生命', 效果公式: 'heal', 目标类型: 'ally', 数值参数: { 治疗比例: 0.35 } },
         { name: '风之加护', 类型: '主动', 稀有度: '稀有', 元素属性: '风', 消耗MP: 18, 冷却回合: 4, 基础威力: 0, 描述: '提升友方速度', 效果公式: 'buff', 目标类型: 'ally', 数值参数: { 速度加成: 2, 持续回合: 3 } },
-        { name: '风缚术', 类型: '主动', 稀有度: '稀有', 元素属性: '风', 消耗MP: 18, 冷却回合: 3, 基础威力: 0, 描述: '降低敌方速度', 效果公式: 'debuff', 目标类型: 'single_enemy', 数值参数: { 速度降低: 2, 持续回合: 3 } },
+        { name: '风缚术', 类型: '主动', 稀有度: '稀有', 元素属性: '风', 消耗MP: 18, 冷却回合: 3, 基础威力: 0, 描述: '降低敌方速度', 效果公式: 'debuff', 目标类型: 'single_enemy', 数值参数: { 速度加成: 2, 持续回合: 3 } },
         { name: '全队鼓舞', 类型: '主动', 稀有度: '史诗', 元素属性: '无', 消耗MP: 30, 冷却回合: 5, 基础威力: 0, 描述: '提升全体友方属性', 效果公式: 'buff', 目标类型: 'all_allies', 数值参数: { 全属性加成: 1, 持续回合: 2 } },
       ],
       passives: [],
@@ -618,7 +637,7 @@ function debugStartBattle() {
         { name: '生命汲取', 类型: '主动', 稀有度: '稀有', 元素属性: '暗', 消耗MP: 25, 冷却回合: 3, 基础威力: 55, 描述: '吸取敌方魔力与生命', 效果公式: 'drain_magic', 目标类型: 'single_enemy', 数值参数: { 命中率: 0.9 } },
         { name: '治愈术', 类型: '主动', 稀有度: '稀有', 元素属性: '光', 消耗MP: 25, 冷却回合: 3, 基础威力: 0, 描述: '恢复友方生命', 效果公式: 'heal', 目标类型: 'ally', 数值参数: { 治疗量: 65 } },
         { name: '冰晶护盾', 类型: '主动', 稀有度: '史诗', 元素属性: '水', 消耗MP: 28, 冷却回合: 4, 基础威力: 0, 描述: '给友方施加护盾', 效果公式: 'buff', 目标类型: 'ally', 数值参数: { 护盾值: 55 } },
-        { name: '虚弱诅咒', 类型: '主动', 稀有度: '稀有', 元素属性: '暗', 消耗MP: 22, 冷却回合: 3, 基础威力: 0, 描述: '降低敌方全属性', 效果公式: 'debuff', 目标类型: 'single_enemy', 数值参数: { 全属性降低: 1, 持续回合: 2 } },
+        { name: '虚弱诅咒', 类型: '主动', 稀有度: '稀有', 元素属性: '暗', 消耗MP: 22, 冷却回合: 3, 基础威力: 0, 描述: '降低敌方全属性并概率中毒', 效果公式: 'debuff', 目标类型: 'single_enemy', 数值参数: { 全属性加成: 1, 持续回合: 2, 中毒概率: 0.4, 中毒回合: 3, 中毒伤害: 0.05 } },
       ],
       passives: [],
     },
@@ -634,9 +653,9 @@ function debugStartBattle() {
       skills: [
         { name: '重斩', 类型: '主动', 稀有度: '普通', 元素属性: '地', 消耗MP: 8, 冷却回合: 0, 基础威力: 55, 描述: '沉重的斩击', 效果公式: 'physical_damage', 目标类型: 'single_enemy', 数值参数: { 命中率: 0.95 } },
         { name: '地裂波', 类型: '主动', 稀有度: '稀有', 元素属性: '地', 消耗MP: 24, 冷却回合: 3, 基础威力: 40, 描述: '全体地面攻击', 效果公式: 'physical_damage', 目标类型: 'all_enemies', 数值参数: { 命中率: 0.9 } },
-        { name: '铁壁', 类型: '主动', 稀有度: '稀有', 元素属性: '地', 消耗MP: 15, 冷却回合: 4, 基础威力: 0, 描述: '大幅提升防御', 效果公式: 'buff', 目标类型: 'self', 数值参数: { 防御力加成: 2, 持续回合: 3 } },
+        { name: '铁壁', 类型: '主动', 稀有度: '稀有', 元素属性: '地', 消耗MP: 15, 冷却回合: 4, 基础威力: 0, 描述: '大幅提升防御', 效果公式: 'buff', 目标类型: 'self', 数值参数: { 防御加成: 2, 持续回合: 3 } },
         { name: '痛击', 类型: '主动', 稀有度: '稀有', 元素属性: '地', 消耗MP: 18, 冷却回合: 2, 基础威力: 75, 描述: '猛力一击', 效果公式: 'physical_damage', 目标类型: 'single_enemy', 数值参数: { 命中率: 0.9 } },
-        { name: '威压', 类型: '主动', 稀有度: '稀有', 元素属性: '暗', 消耗MP: 15, 冷却回合: 3, 基础威力: 0, 描述: '降低敌方攻击', 效果公式: 'debuff', 目标类型: 'single_enemy', 数值参数: { 攻击力降低: 2, 持续回合: 2 } },
+        { name: '威压', 类型: '主动', 稀有度: '稀有', 元素属性: '暗', 消耗MP: 15, 冷却回合: 3, 基础威力: 0, 描述: '降低敌方攻击', 效果公式: 'debuff', 目标类型: 'single_enemy', 数值参数: { 攻击加成: 2, 持续回合: 2 } },
         { name: '狂战士之怒', 类型: '主动', 稀有度: '史诗', 元素属性: '火', 消耗MP: 32, 冷却回合: 5, 基础威力: 100, 描述: '高暴击强攻', 效果公式: 'physical_damage', 目标类型: 'single_enemy', 数值参数: { 命中率: 0.85, 暴击率加成: 0.15 } },
       ],
       passives: [],
@@ -651,7 +670,7 @@ function debugStartBattle() {
         { name: '影袭', 类型: '主动', 稀有度: '普通', 元素属性: '暗', 消耗MP: 8, 冷却回合: 0, 基础威力: 48, 描述: '暗影突袭', 效果公式: 'physical_damage', 目标类型: 'single_enemy', 数值参数: { 命中率: 0.95 } },
         { name: '暗影弹', 类型: '主动', 稀有度: '普通', 元素属性: '暗', 消耗MP: 10, 冷却回合: 0, 基础威力: 52, 描述: '暗系法术攻击', 效果公式: 'magic_damage', 目标类型: 'single_enemy', 数值参数: { 命中率: 0.9 } },
         { name: '暗步', 类型: '主动', 稀有度: '稀有', 元素属性: '暗', 消耗MP: 15, 冷却回合: 4, 基础威力: 0, 描述: '提升自身速度', 效果公式: 'buff', 目标类型: 'self', 数值参数: { 速度加成: 2, 持续回合: 3 } },
-        { name: '烟雾弹', 类型: '主动', 稀有度: '稀有', 元素属性: '暗', 消耗MP: 16, 冷却回合: 3, 基础威力: 0, 描述: '降低敌方速度', 效果公式: 'debuff', 目标类型: 'single_enemy', 数值参数: { 速度降低: 2, 持续回合: 2 } },
+        { name: '烟雾弹', 类型: '主动', 稀有度: '稀有', 元素属性: '暗', 消耗MP: 16, 冷却回合: 3, 基础威力: 0, 描述: '降低敌方速度', 效果公式: 'debuff', 目标类型: 'single_enemy', 数值参数: { 速度加成: 2, 持续回合: 2 } },
         { name: '连环击', 类型: '主动', 稀有度: '稀有', 元素属性: '暗', 消耗MP: 20, 冷却回合: 2, 基础威力: 35, 描述: '二连击', 效果公式: 'physical_damage', 目标类型: 'single_enemy', 数值参数: { 伤害次数: 2, 命中率: 0.9 } },
         { name: '暗杀术', 类型: '主动', 稀有度: '史诗', 元素属性: '暗', 消耗MP: 30, 冷却回合: 4, 基础威力: 90, 描述: '高暴击暗杀', 效果公式: 'physical_damage', 目标类型: 'single_enemy', 数值参数: { 命中率: 0.85, 暴击率加成: 0.2 } },
       ],
@@ -667,7 +686,7 @@ function debugStartBattle() {
         { name: '火球术', 类型: '主动', 稀有度: '普通', 元素属性: '火', 消耗MP: 10, 冷却回合: 0, 基础威力: 58, 描述: '火球攻击', 效果公式: 'magic_damage', 目标类型: 'single_enemy', 数值参数: { 命中率: 0.95 } },
         { name: '烈焰风暴', 类型: '主动', 稀有度: '稀有', 元素属性: '火', 消耗MP: 30, 冷却回合: 4, 基础威力: 48, 描述: '全体火焰魔法', 效果公式: 'magic_damage', 目标类型: 'all_enemies', 数值参数: { 命中率: 0.85 } },
         { name: '魔力吸取', 类型: '主动', 稀有度: '稀有', 元素属性: '暗', 消耗MP: 22, 冷却回合: 3, 基础威力: 52, 描述: '吸取魔力', 效果公式: 'drain_magic', 目标类型: 'single_enemy', 数值参数: { 命中率: 0.9 } },
-        { name: '灼热光环', 类型: '主动', 稀有度: '稀有', 元素属性: '火', 消耗MP: 20, 冷却回合: 4, 基础威力: 0, 描述: '降低敌方特防', 效果公式: 'debuff', 目标类型: 'single_enemy', 数值参数: { 特防降低: 2, 持续回合: 3 } },
+        { name: '灼热光环', 类型: '主动', 稀有度: '稀有', 元素属性: '火', 消耗MP: 20, 冷却回合: 4, 基础威力: 0, 描述: '降低敌方特防并造成灼烧', 效果公式: 'debuff', 目标类型: 'single_enemy', 数值参数: { 特防加成: 2, 持续回合: 3, 灼烧概率: 0.55, 灼烧回合: 3, 灼烧伤害: 0.06 } },
         { name: '火焰护盾', 类型: '主动', 稀有度: '稀有', 元素属性: '火', 消耗MP: 24, 冷却回合: 4, 基础威力: 0, 描述: '给敌方强攻手加护盾', 效果公式: 'buff', 目标类型: 'ally', 数值参数: { 护盾值: 45 } },
         { name: '业火', 类型: '主动', 稀有度: '史诗', 元素属性: '火', 消耗MP: 40, 冷却回合: 5, 基础威力: 115, 描述: '超高威力火系魔法', 效果公式: 'magic_damage', 目标类型: 'single_enemy', 数值参数: { 命中率: 0.8, 暴击率加成: 0.1 } },
       ],
@@ -700,14 +719,12 @@ $(() => {
     const $floatBtn = createScriptIdDiv()
       .css({ position: 'fixed', bottom: '20px', right: '20px', zIndex: '9999' })
       .html(`
-        <div class="zj-battle-float">
-          <button class="zj-btn-main" id="zj-start">⚔ 战斗</button>
-          <button class="zj-btn-debug" id="zj-debug">🔧</button>
+        <div style="display:flex;gap:6px;align-items:center;position:relative;">
+          <button style="padding:8px 16px;background:linear-gradient(135deg,#8b1a1a,#c0392b);color:#f5e6c8;border:1px solid #d4a44c;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,0.5);transition:all 0.15s ease;" id="zj-start">⚔ 战斗</button>
+          <button style="padding:8px 10px;background:rgba(40,50,70,0.9);color:#94a8b8;border:1px solid rgba(200,180,140,0.2);border-radius:6px;cursor:pointer;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,0.5);transition:all 0.15s ease;" id="zj-debug">🔧</button>
         </div>
       `)
       .appendTo('body');
-
-    const { destroy: destroyBtnStyle } = teleportStyle();
 
     function showPrepPanel() {
       if ($floatBtn.find('.zj-prep-panel').length) {
@@ -730,11 +747,11 @@ $(() => {
       const allyText = allyNames.length ? allyNames.join(' / ') : '（未检测到）';
       const enemyText = enemyNames.length ? enemyNames.join(' / ') : '（未检测到）';
       const $panel = $(`
-        <div class="zj-prep-panel">
-          <div class="zj-prep-row"><span class="zj-prep-label">类型</span><span>${battleType}</span></div>
-          <div class="zj-prep-row"><span class="zj-prep-label">己方</span><span>${allyText}</span></div>
-          <div class="zj-prep-row"><span class="zj-prep-label">敌方</span><span>${enemyText}</span></div>
-          <button class="zj-prep-go" id="zj-prep-go">开始战斗</button>
+        <div style="position:absolute;bottom:calc(100% + 8px);right:0;min-width:220px;padding:12px;background:rgba(10,20,40,0.97);border:1px solid rgba(212,164,76,0.4);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.6);display:flex;flex-direction:column;gap:6px;">
+          <div style="display:flex;gap:8px;font-size:12px;color:#c8d8e8;"><span style="color:#d4a44c;font-weight:600;min-width:32px;flex-shrink:0;">类型</span><span>${battleType}</span></div>
+          <div style="display:flex;gap:8px;font-size:12px;color:#c8d8e8;"><span style="color:#d4a44c;font-weight:600;min-width:32px;flex-shrink:0;">己方</span><span>${allyText}</span></div>
+          <div style="display:flex;gap:8px;font-size:12px;color:#c8d8e8;"><span style="color:#d4a44c;font-weight:600;min-width:32px;flex-shrink:0;">敌方</span><span>${enemyText}</span></div>
+          <button style="margin-top:4px;padding:7px 0;background:linear-gradient(135deg,#8b1a1a,#c0392b);color:#f5e6c8;border:1px solid #d4a44c;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;transition:all 0.15s ease;" id="zj-prep-go">开始战斗</button>
         </div>
       `).appendTo($floatBtn);
       $panel.find('#zj-prep-go').on('click', () => {
@@ -767,15 +784,14 @@ $(() => {
 
     const onBattleCloseMessage = (e: MessageEvent) => {
       if (e.data?.type === 'battle-close' && e.data?.source === 'th-battle-ui') {
-        closeBattleUI();
+        destroyBattle();
       }
     };
 
-    window.addEventListener('message', onBattleCloseMessage);
+    window.parent.addEventListener('message', onBattleCloseMessage);
 
     $(window).on('pagehide', () => {
-      window.removeEventListener('message', onBattleCloseMessage);
-      destroyBtnStyle();
+      window.parent.removeEventListener('message', onBattleCloseMessage);
       $floatBtn.remove();
       destroyBattle();
     });
