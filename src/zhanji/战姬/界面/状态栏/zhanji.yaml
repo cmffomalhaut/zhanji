@@ -2946,7 +2946,7 @@ function renderCharsList($scroll) {
                   ${mp > 0 ? `<span class="skill-mp">💧${mp}</span>` : ''}
                   ${cd > 0 ? `<span class="skill-cd">⏱️CD:${cd}</span>` : ''}
                   ${power > 0 ? `<span style="font-size:10px;color:#f59e0b;font-weight:bold;">💥${power}</span>` : ''}
-                  ${slotNum !== 1 ? `<button class="btn-refresh-skill" data-char-name="${name}" data-slot-key="${skillKey}" title="重铸此技能" style="margin-left:4px;${!isLatest ? 'opacity:0.5;pointer-events:none;' : ''}" ${!isLatest ? 'disabled' : ''}>🔄</button>` : ''}
+                  <button class="btn-refresh-skill" data-char-name="${name}" data-slot-key="${skillKey}" title="重铸此技能" style="margin-left:4px;${!isLatest ? 'opacity:0.5;pointer-events:none;' : ''}" ${!isLatest ? 'disabled' : ''}>🔄</button>
                 </div>
               </div>
               ${label ? `<div class="slot-type-hint">${label.desc}</div>` : ''}
