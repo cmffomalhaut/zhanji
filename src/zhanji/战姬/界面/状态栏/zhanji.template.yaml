@@ -1,0 +1,183 @@
+```html
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="script.js"></script>
+
+
+
+
+
+</head>
+<body>
+  <div id="app">
+    <div class="top-bar">
+      <div class="top-left">
+        <button class="top-btn" id="btn-refresh">🔄</button>
+        <div class="top-info">
+          <span id="top-date">📅5月8日 周日</span>
+          <span id="top-time">⏰08:00</span>
+        </div>
+      </div>
+      <div class="top-btns">
+        <div class="gold-badge">🪙 <span id="top-gold">0</span></div>
+        <button class="top-btn" id="btn-collapse">▼</button>
+      </div>
+    </div>
+
+    <div class="main-content">
+      <div class="list-panel active" id="panel-chars">
+        <div class="list-header">⚔️ 战姬列表</div>
+        <div class="list-scroll"></div>
+      </div>
+
+      <div class="list-panel" id="panel-trainer">
+        <div class="list-header">👤 训练家</div>
+        <div class="list-scroll"></div>
+      </div>
+
+      <div class="list-panel" id="panel-bag">
+        <div class="list-header">🎒 背包</div>
+        <div class="list-scroll"></div>
+      </div>
+
+      <div class="list-panel" id="panel-quest">
+        <div class="list-header">📜 任务</div>
+        <div class="list-scroll"></div>
+      </div>
+
+
+      <div class="list-panel" id="panel-shop">
+        <div class="list-header">🏪 商店</div>
+        <div class="list-scroll"></div>
+      </div>
+
+      <div class="list-panel" id="panel-warehouse">
+        <div class="list-scroll"></div>
+      </div>
+
+      <div class="list-panel" id="panel-senki-warehouse">
+        <div class="list-scroll"></div>
+      </div>
+
+      <div class="modal-overlay" id="shop-modal">
+        <div class="modal-box">
+          <div class="modal-title" id="modal-title"></div>
+          <div class="modal-desc" id="modal-desc"></div>
+          <div class="modal-price" id="modal-price"></div>
+          <div class="modal-btns">
+            <button class="modal-btn cancel" id="modal-cancel">取消</button>
+            <button class="modal-btn confirm" id="modal-confirm">确认购买</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-overlay" id="warehouse-modal">
+        <div class="modal-box">
+          <div class="modal-title" id="wh-modal-title"></div>
+          <div class="modal-desc" id="wh-modal-desc"></div>
+          <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin:12px 0 16px;">
+            <span style="color:#94a3b8;font-size:13px;">数量:</span>
+            <input type="number" id="wh-modal-qty" class="wh-modal-qty-input" min="1" value="1">
+            <span style="color:#94a3b8;font-size:12px;" id="wh-modal-max"></span>
+          </div>
+          <div class="modal-btns">
+            <button class="modal-btn cancel" id="wh-modal-cancel">取消</button>
+            <button class="modal-btn confirm" id="wh-modal-confirm">确认</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-overlay" id="destroy-modal">
+        <div class="modal-box">
+          <div class="modal-title" id="destroy-modal-title"></div>
+          <div class="modal-desc" id="destroy-modal-desc"></div>
+          <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin:12px 0 16px;">
+            <span style="color:#94a3b8;font-size:13px;">数量:</span>
+            <input type="number" id="destroy-modal-qty" class="wh-modal-qty-input" min="1" value="1">
+            <span style="color:#94a3b8;font-size:12px;" id="destroy-modal-max"></span>
+          </div>
+          <div class="modal-btns">
+            <button class="modal-btn cancel" id="destroy-modal-cancel">取消</button>
+            <button class="modal-btn confirm" id="destroy-modal-confirm" style="background:linear-gradient(135deg,#ef4444,#dc2626);">销毁</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-overlay" id="delete-quest-modal">
+        <div class="modal-box">
+          <div class="modal-title" id="del-modal-title"></div>
+          <div class="modal-desc" id="del-modal-desc"></div>
+          <div class="modal-btns">
+            <button class="modal-btn cancel" id="del-modal-cancel">取消</button>
+            <button class="modal-btn confirm" id="del-modal-confirm" style="background:linear-gradient(135deg,#ef4444,#dc2626);">删除</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-overlay" id="claim-modal">
+        <div class="modal-box">
+          <div class="modal-title" id="claim-modal-title">🎁 领取奖励</div>
+          <div class="modal-desc" id="claim-modal-desc" style="white-space:pre-line;"></div>
+          <div class="modal-btns">
+            <button class="modal-btn cancel" id="claim-modal-cancel">取消</button>
+            <button class="modal-btn confirm" id="claim-modal-confirm" style="background:linear-gradient(135deg,#22c55e,#16a34a);">领取</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-overlay" id="learn-modal">
+        <div class="modal-box" style="max-width:420px;">
+          <div class="modal-title" id="learn-modal-title">🎓 技能学习机</div>
+          <div class="modal-desc" id="learn-modal-body" style="white-space:normal;max-height:360px;overflow-y:auto;"></div>
+          <div class="modal-btns">
+            <button class="modal-btn cancel" id="learn-modal-cancel">取消</button>
+            <button class="modal-btn confirm" id="learn-modal-confirm" style="background:linear-gradient(135deg,#a78bfa,#7c3aed);display:none;">🎓 确认学习</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="detail-panel" id="detail-panel">
+        <div class="detail-header">
+          <div class="detail-header-top">
+            <button class="back-btn" id="btn-back">← 返回</button>
+            <span class="char-badge" id="detail-badge">Lv.1</span>
+          </div>
+          <div class="char-name" id="detail-name">NAME</div>
+          <div id="detail-owner"></div>
+          <div id="detail-actions" style="margin-top:4px;"></div>
+        </div>
+        <div class="detail-scroll" id="detail-scroll"></div>
+      </div>
+    </div>
+
+    <div class="bottom-nav">
+      <div class="nav-item active" id="nav-chars">
+        <span class="nav-icon">⚔️</span>
+        <span class="nav-text">战姬</span>
+      </div>
+      <div class="nav-item" id="nav-trainer">
+        <span class="nav-icon">👤</span>
+        <span class="nav-text">训练家</span>
+      </div>
+      <div class="nav-item" id="nav-bag">
+        <span class="nav-icon">🎒</span>
+        <span class="nav-text">背包</span>
+      </div>
+      <div class="nav-item" id="nav-quest">
+        <span class="nav-icon">📜</span>
+        <span class="nav-text">任务</span>
+      </div>
+
+      <div class="nav-item" id="nav-shop">
+        <span class="nav-icon">🏪</span>
+        <span class="nav-text">商店</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+```

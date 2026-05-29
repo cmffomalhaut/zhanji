@@ -4,7 +4,7 @@ const path = require('path');
 
 const dir = __dirname;
 
-let yaml = fs.readFileSync(path.join(dir, 'zhanji.yaml'), 'utf8');
+let yaml = fs.readFileSync(path.join(dir, 'zhanji.template.yaml'), 'utf8');
 const css = fs.readFileSync(path.join(dir, 'styles.css'), 'utf8');
 const js = fs.readFileSync(path.join(dir, 'script.js'), 'utf8');
 
