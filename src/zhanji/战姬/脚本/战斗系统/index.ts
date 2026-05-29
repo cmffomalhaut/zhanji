@@ -56,7 +56,7 @@ function extractBattleUnit(name: string, charData: Record<string, any>): BattleU
 
     if (s.类型 === '被动' || s.类型 === '天赋' || s.类型 === '光环') {
       passives.push({
-        name: skillName,
+        name: s.name || skillName,
         类型: s.类型,
         描述: s.描述 ?? '',
         效果公式: s.效果公式 ?? '',
@@ -66,7 +66,7 @@ function extractBattleUnit(name: string, charData: Record<string, any>): BattleU
     }
 
     skills.push({
-      name: skillName,
+      name: s.name || skillName,
       类型: s.类型 ?? '主动',
       稀有度: s.稀有度 ?? 'N',
       元素属性: (s.元素属性 ?? '无') as Element,
@@ -83,7 +83,7 @@ function extractBattleUnit(name: string, charData: Record<string, any>): BattleU
   return {
     name,
     性格: charData.性格,
-    好感度: Number(charData.好感度) || 0,
+     好感度: charData.好感度 != null ? Number(charData.好感度) : undefined,
     堕落值: Number(charData.堕落值) || 0,
     等级: Number(charData.等级) || 1,
     稀有度: charData.稀有度,
@@ -274,7 +274,18 @@ async function sendBattleLog(
   }
 
   // ===== 捕捉结果 =====
-  if (result.capture) {
+  if (result.captures && result.captures.length > 0) {
+    for (const capture of result.captures) {
+      if (capture.result.success) {
+        lines.push('');
+        lines.push(`🎯 捕捉成功！${capture.targetName} 被收入囊中`);
+        if (capture.result.sRankHardLock) lines.push(`   (S级硬锁，骰出1点，奇迹！)`);
+      } else {
+        lines.push('');
+        lines.push(`🎯 捕捉失败（${capture.targetName}）— ${capture.result.detailText.replace(/；掷骰\d+\/\d+.*/, '')}`);
+      }
+    }
+  } else if (result.capture) {
     if (result.capture.success) {
       lines.push('');
       lines.push(`🎯 捕捉成功！${enemyNames[0]} 被收入囊中`);
@@ -322,7 +333,7 @@ async function writeBattleResult(
   enemyTeamNames: string[],
   result: BattleResult,
   messageId: number,
-  usedItemName: string | null,
+  usedItemNames: string[],
   captureBallsUsed: string[],
 ) {
   await waitGlobalInitialized('Mvu');
@@ -362,13 +373,15 @@ async function writeBattleResult(
     _.set(statData, '金币', curGold + result.goldGained);
   }
 
-  if (usedItemName) {
-    const itemPath = `背包.${usedItemName}.数量`;
-    const currentCount = Number(_.get(statData, itemPath, 0));
-    if (currentCount > 0) {
-      _.set(statData, itemPath, Math.max(0, currentCount - 1));
-      if (Number(_.get(statData, itemPath, 0)) <= 0) {
-        _.unset(statData, `背包.${usedItemName}`);
+  if (usedItemNames.length > 0) {
+    for (const usedItemName of usedItemNames) {
+      const itemPath = `背包.${usedItemName}.数量`;
+      const currentCount = Number(_.get(statData, itemPath, 0));
+      if (currentCount > 0) {
+        _.set(statData, itemPath, Math.max(0, currentCount - 1));
+        if (Number(_.get(statData, itemPath, 0)) <= 0) {
+          _.unset(statData, `背包.${usedItemName}`);
+        }
       }
     }
   }
@@ -405,11 +418,11 @@ async function writeBattleResult(
     }
   }
 
-  if (result.capture?.success) {
-    const capturedIdx = result.enemyTeamState.findIndex(u => u.name);
-    if (capturedIdx >= 0) {
-      const capturedName = result.enemyTeamState[capturedIdx].name;
-      const capturedHPMax = result.enemyTeamState[capturedIdx].HPMax;
+  const capturedNames = result.captures
+    ?.filter(c => c.result.success)
+    .map(c => c.targetName) ?? (result.capture?.success ? [enemyTeamNames[0]] : []);
+
+  for (const capturedName of capturedNames) {
       const capturedData = _.get(statData, `角色数据.${capturedName}`);
       if (capturedData) {
         capturedData.从属训练家 = _.get(statData, '玩家名', '');
@@ -420,7 +433,6 @@ async function writeBattleResult(
         if (!capturedData.法力值) capturedData.法力值 = {};
         capturedData.法力值.当前值 = 1;
       }
-    }
   }
 
   if (result.enemyCaptureAlly?.success) {
@@ -492,9 +504,11 @@ function startBattle(messageId: number) {
   const location = _.get(mergedStat, '世界.地点', '') as string;
   const trainerEquip = _.get(mergedStat, '训练家.特殊装备', []) as Array<{ 名称?: string }>;
   const hasTechAssist = trainerEquip.some(e => e.名称?.includes('捕捉辅助器'));
+  const hasMihunxiang = Number(_.get(mergedStat, '背包.迷魂香.数量', 0)) > 0
+    || trainerEquip.some(e => e.名称?.includes('迷魂香'));
   console.info(`[战斗系统] 开始战斗: [${battleAllyTeamNames.join(', ')}] vs [${battleEnemyTeamNames.join(', ')}]`);
 
-  createBattleIframe(allyUnits, enemyUnits, consoleData.战斗类型, items, balls, consoleData.敌方训练家信息, location, hasTechAssist);
+  createBattleIframe(allyUnits, enemyUnits, consoleData.战斗类型, items, balls, consoleData.敌方训练家信息, location, hasTechAssist, hasMihunxiang);
 }
 
 function createBattleIframe(
@@ -506,11 +520,13 @@ function createBattleIframe(
   enemyTrainerInfo?: BattleConsole['敌方训练家信息'],
   location?: string,
   hasTechAssist?: boolean,
+  hasMihunxiang?: boolean,
 ) {
   resetPortraitPool();
   if ($iframe) destroyBattle();
 
   $iframe = createScriptIdIframe()
+    .attr('scrolling', 'yes')
     .css({
       position: 'fixed',
       top: '0',
@@ -521,12 +537,19 @@ function createBattleIframe(
       borderRadius: '0',
       zIndex: '99999',
       background: 'transparent',
+      overflow: 'auto',
     })
     .appendTo('body')
     .on('load', () => {
       const iframeDoc = $iframe![0].contentDocument!;
       const { destroy } = teleportStyle(iframeDoc.head);
       destroyTeleportedStyle = destroy;
+
+      iframeDoc.documentElement.style.setProperty('overflow-x', 'hidden', 'important');
+      iframeDoc.documentElement.style.setProperty('overflow-y', 'auto', 'important');
+      iframeDoc.body.style.setProperty('overflow-x', 'hidden', 'important');
+      iframeDoc.body.style.setProperty('overflow-y', 'auto', 'important');
+      iframeDoc.body.style.setProperty('min-height', '100vh');
 
       const pinia = createPinia();
       vueApp = createApp(App).use(pinia);
@@ -535,9 +558,12 @@ function createBattleIframe(
       store.initBattle(allyUnits, enemyUnits, type, items, balls, enemyTrainerInfo);
       store.location = location ?? '';
       if (hasTechAssist) store.hasTechAssist = true;
+      if (hasMihunxiang) store.hasMihunxiang = true;
 
       store.registerOnBattleEnd(async (result: BattleResult) => {
-        await writeBattleResult(battleAllyTeamNames, battleEnemyTeamNames, result, battleMessageId, store.usedItemName, store.captureBallsUsed);
+        const consumedItems = [...store.usedItemNames];
+        if (hasMihunxiang) consumedItems.push('迷魂香');
+        await writeBattleResult(battleAllyTeamNames, battleEnemyTeamNames, result, battleMessageId, consumedItems, store.captureBallsUsed);
         await sendBattleLog(battleAllyTeamNames, battleEnemyTeamNames, result);
         destroyBattle();
       });
@@ -597,7 +623,7 @@ function debugStartBattle() {
     {
       name: '赵羽', 等级: 14, 稀有度: 'A', 战斗类型: '强攻型', 元素属性: '火',
       攻击力: 124, 防御力: 79, 特攻: 41, 特防: 44, 速度: 114,
-      HP: 476, HPMax: 476, MP: 236, MPMax: 236, shield: 0, shieldMax: 0,
+      HP: 476, HPMax: 476, MP: 236, MPMax: 236, shield: 0, shieldMax: 200,
       cooldowns: {}, statusEffects: [],
       skills: [
         { name: '破军斩', 类型: '主动', 稀有度: '普通', 元素属性: '火', 消耗MP: 10, 冷却回合: 0, 基础威力: 60, 描述: '烈焰附着的斩击', 效果公式: 'physical_damage', 目标类型: 'single_enemy', 数值参数: { 命中率: 0.95 } },
@@ -606,8 +632,11 @@ function debugStartBattle() {
         { name: '战吼', 类型: '主动', 稀有度: '稀有', 元素属性: '无', 消耗MP: 15, 冷却回合: 4, 基础威力: 0, 描述: '提升自身攻击', 效果公式: 'buff', 目标类型: 'self', 数值参数: { 攻击加成: 2, 持续回合: 3 } },
         { name: '碎甲击', 类型: '主动', 稀有度: '稀有', 元素属性: '地', 消耗MP: 15, 冷却回合: 3, 基础威力: 30, 描述: '降低敌方防御并可能造成流血', 效果公式: 'debuff', 目标类型: 'single_enemy', 数值参数: { 防御加成: 2, 持续回合: 3, 命中率: 0.9, 流血概率: 0.45, 流血回合: 3, 流血伤害: 0.05 } },
         { name: '绝杀突刺', 类型: '主动', 稀有度: '史诗', 元素属性: '火', 消耗MP: 35, 冷却回合: 5, 基础威力: 110, 描述: '高暴击的致命一击', 效果公式: 'physical_damage', 目标类型: 'single_enemy', 数值参数: { 命中率: 0.85, 暴击率加成: 0.2 } },
+        { name: '壁垒冲击', 类型: '主动', 稀有度: '史诗', 元素属性: '地', 消耗MP: 28, 冷却回合: 3, 基础威力: 50, 描述: '用防御和护盾发动强力反击', 效果公式: 'shield_damage', 目标类型: 'single_enemy', 数值参数: { 护盾倍率: 0.5, 系数: 0.6, 命中率: 0.9 } },
       ],
-      passives: [],
+      passives: [
+        { name: '战意护体', 类型: '被动', 描述: '受到攻击时有30%概率获得护盾', 效果公式: '', 数值参数: { 护盾触发概率: 0.3, 护盾比例: 0.15, 持续回合: 3 } },
+      ],
     },
     // === 我方速度: 覆盖 physical / magic / heal / buff-speed / debuff-speed / buff-all_allies ===
     {

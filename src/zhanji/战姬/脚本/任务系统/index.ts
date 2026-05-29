@@ -143,6 +143,85 @@ function buildTaskObject(template: any, id: string, type: string, dateStr: strin
 }
 
 // ====================================================================
+// 据点日结算
+// ====================================================================
+
+const COLLECTION_AFFECTION: Record<number, number> = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 5 };
+const WORK_INCOME: Record<number, number> = { 1: 50, 2: 100, 3: 200, 4: 350, 5: 500 };
+
+function doBaseSettlement(newVars: any, newData: any, currentDate: string) {
+  const base = _.get(newData, '训练家.据点', {});
+  if (!base.已解锁) return;
+
+  // 读取战姬仓库
+  let warehouse: Record<string, any> = {};
+  try {
+    const chatVars = getVariables({ type: 'chat' }) || {};
+    warehouse = chatVars['战姬仓库'] || {};
+    if (typeof warehouse !== 'object' || warehouse === null) warehouse = {};
+  } catch(e) {
+    console.warn('[任务系统] 读取战姬仓库失败:', e);
+    return;
+  }
+
+  let warehouseChanged = false;
+
+  // ====== 收藏室结算 ======
+  if (base.收藏室?.已解锁) {
+    const colRoom = base.收藏室;
+    const colNames: string[] = colRoom.当前使用 || [];
+    const affBonus = COLLECTION_AFFECTION[colRoom.等级] || 0;
+
+    if (colRoom.等级 > 0 && colNames.length > 0 && affBonus > 0) {
+      for (const name of colNames) {
+        const stored = warehouse[name];
+        if (stored?.数据) {
+          const char = stored.数据;
+          char.好感度 = _.clamp((char.好感度 || 0) + affBonus, -100, 200);
+          console.info(`  [收藏室] ${name} 好感度 +${affBonus}`);
+
+          const hpRecover = Math.floor((char.生命值?.最大值 || 100) * 0.3);
+          const mpRecover = Math.floor((char.法力值?.最大值 || 50) * 0.3);
+          char.生命值.当前值 = _.clamp((char.生命值?.当前值 || 0) + hpRecover, 0, char.生命值?.最大值 || 100);
+          char.法力值.当前值 = _.clamp((char.法力值?.当前值 || 0) + mpRecover, 0, char.法力值?.最大值 || 50);
+          console.info(`  [收藏室] ${name} HP+${hpRecover} MP+${mpRecover}`);
+          warehouseChanged = true;
+        }
+      }
+    }
+  }
+
+  // ====== 工作区结算 ======
+  if (base.工作区?.已解锁) {
+    const wa = base.工作区;
+    const waNames: string[] = wa.当前使用 || [];
+    const income = wa.效果数值 || WORK_INCOME[wa.等级] || 0;
+
+    if (wa.等级 > 0 && waNames.length > 0) {
+      const totalIncome = income * waNames.length;
+      const oldGold = _.get(newData, '金币', 0);
+      _.set(newData, '金币', oldGold + totalIncome);
+      console.info(`  [工作区] 金币 +${totalIncome} (${income}/人 × ${waNames.length}人)`);
+    }
+  }
+
+  // 保存仓库
+  if (warehouseChanged) {
+    try {
+      const chatVars = getVariables({ type: 'chat' }) || {};
+      chatVars['战姬仓库'] = warehouse;
+      replaceVariables(chatVars, { type: 'chat' });
+    } catch(e) {
+      console.warn('[任务系统] 保存战姬仓库失败:', e);
+    }
+  }
+
+  // 更新结算日期
+  _.set(newVars, 'stat_data.世界._上次结算日期', currentDate);
+  console.info(`[任务系统] 🏠 据点日结算完成 → ${currentDate}`);
+}
+
+// ====================================================================
 // 主逻辑
 // ====================================================================
 
@@ -251,6 +330,13 @@ $(() => {
           };
         });
         console.info(`[任务系统] 已刷新 ${selected.length} 个周常任务`);
+      }
+
+      // ====== 战姬仓库日结算 ======
+      const lastSettlement = _.get(newData, '世界._上次结算日期', '');
+      if (currentDate && currentDate !== lastSettlement) {
+        console.info(`[任务系统] 🏠 日期变化: ${lastSettlement} → ${currentDate}，执行据点日结算`);
+        doBaseSettlement(newVars, newData, currentDate);
       }
 
       // 回写奖励映射

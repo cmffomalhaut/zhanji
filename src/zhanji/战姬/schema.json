@@ -678,6 +678,9 @@
                 "效果公式": {
                   "type": "string"
                 },
+                "目标类型": {
+                  "type": "string"
+                },
                 "数值参数": {
                   "default": {},
                   "type": "object",

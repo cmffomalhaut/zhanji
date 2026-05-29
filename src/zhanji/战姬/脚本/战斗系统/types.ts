@@ -13,7 +13,8 @@ export type EffectFormula =
   | 'buff'
   | 'debuff'
   | 'drain_physical'
-  | 'drain_magic';
+  | 'drain_magic'
+  | 'shield_damage';
 
 /** 技能目标类型 */
 export type SkillTargetType = 'single_enemy' | 'self' | 'ally' | 'all_enemies' | 'all_allies';
@@ -157,7 +158,9 @@ export interface BattleUnit {
 export interface TeamUnitState {
   name: string;
   HP: number;
+  HPMax: number;
   MP: number;
+  MPMax: number;
   isDefeated: boolean;
 }
 
@@ -185,6 +188,12 @@ export interface BattleItem {
   element?: Element;
   healLevel?: '初级' | '中级' | '高级';
   count: number;
+}
+
+export interface ItemUseResult {
+  ok: boolean;
+  message: string;
+  itemName?: string;
 }
 
 // ====================================================================
@@ -226,10 +235,11 @@ export interface BattleLogEntry {
 
 /** 玩家指令 */
 export interface BattleCommand {
-  action: 'skill' | 'switch' | 'escape';
+  action: 'skill' | 'switch' | 'escape' | 'item';
   skillName?: string;
   targetIndex?: number;
   switchToIndex?: number;
+  item?: BattleItem;
 }
 
 /** 强制换人上下文 */
@@ -282,6 +292,8 @@ export interface CaptureAttempt {
   trainerSkillBonus?: number;
   /** 是否使用捕捉辅助器道具 (+15%) */
   useTechAssist?: boolean;
+  /** 是否使用迷魂香 (+15%) */
+  useMihunxiang?: boolean;
   /** 敌方好感度（用于抵抗修正） */
   enemyAffection?: number;
   /** 敌方堕落值（用于抵抗修正） */
@@ -307,11 +319,18 @@ export interface CaptureRollResult {
   baseRate: number;
   ballMultiplier: number;
   techMod: number;
+  mihunxiangMod?: number;
   statusMod: number;
   resistMod: number;
   /** S级硬锁：仅骰出1成功，且其他加成无效 */
   sRankHardLock?: boolean;
   detailText: string;
+}
+
+export interface CaptureOutcome {
+  targetName: string;
+  result: CaptureRollResult;
+  enemyEscaped?: boolean;
 }
 
 export interface BattleResult {
@@ -328,6 +347,7 @@ export interface BattleResult {
   log: BattleLogEntry[];
   enemyPostAction?: 'continue' | 'retreat' | 'surrender';
   capture?: CaptureRollResult;
+  captures?: CaptureOutcome[];
   /** 敌方在捕获失败后逃跑 */
   enemyEscaped?: boolean;
   /** 敌方训练家捕获了我方战姬 */

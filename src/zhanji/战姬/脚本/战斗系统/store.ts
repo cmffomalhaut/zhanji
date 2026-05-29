@@ -12,6 +12,7 @@ import type {
   BattleUnit,
   CaptureAttempt,
   CaptureBallItem,
+  CaptureOutcome,
   CaptureRollResult,
   EnemyAiPersona,
   EnemyTrainerArchetype,
@@ -65,6 +66,7 @@ export const useBattleStore = defineStore('battle', () => {
   const battleType = ref<BattleConsole['战斗类型']>('普通');
   const location = ref<string>('');
   const hasTechAssist = ref(false);
+  const hasMihunxiang = ref(false);
 
   const ally = ref<BattleUnit | null>(null);
   const enemy = ref<BattleUnit | null>(null);
@@ -82,7 +84,8 @@ export const useBattleStore = defineStore('battle', () => {
   // 道具相关
   const availableItems = ref<BattleItem[]>([]);
   const itemUsed = ref(false);
-  const usedItemName = ref<string | null>(null);
+  const usedItemNames = ref<string[]>([]);
+  const usedItemName = computed(() => usedItemNames.value[usedItemNames.value.length - 1] ?? null);
 
   const captureBalls = ref<CaptureBallItem[]>([]);
   const enemyEscapedDuringCapture = ref(false);
@@ -115,6 +118,10 @@ export const useBattleStore = defineStore('battle', () => {
 
   const capturePreview = ref<CaptureRollResult | null>(null);
   const captureBallsUsed = ref<string[]>([]);
+  const captureLastBallUsed = computed(() => captureBallsUsed.value[captureBallsUsed.value.length - 1] ?? null);
+  const captureTargetQueue = ref<number[]>([]);
+  const completedCaptures = ref<CaptureOutcome[]>([]);
+  const currentCaptureTargetIndex = ref<number | null>(null);
 
   let _onBattleEnd: ((result: BattleResult) => void) | null = null;
 
@@ -183,9 +190,12 @@ export const useBattleStore = defineStore('battle', () => {
     availableItems.value = items;
     itemUsed.value = false;
     forcedSwitchSide.value = null;
-    usedItemName.value = null;
+    usedItemNames.value = [];
     capturePreview.value = null;
     captureBallsUsed.value = [];
+    captureTargetQueue.value = [];
+    completedCaptures.value = [];
+    currentCaptureTargetIndex.value = null;
     captureBalls.value = [...balls];
     enemyEscapedDuringCapture.value = false;
 
@@ -205,11 +215,28 @@ export const useBattleStore = defineStore('battle', () => {
 
   function useItem(item: BattleItem) {
     if (!engine.value) return;
-    engine.value.useItem(item);
-    itemUsed.value = true;
-    usedItemName.value = item.name;
-    phase.value = 'selecting';
+    phase.value = 'animating';
+
+    const actions = engine.value.executeRound({ action: 'item', item });
+    lastActions.value = actions;
+    const itemResult = engine.value.lastItemUseResult;
+    if (itemResult?.ok && itemResult.itemName) {
+      itemUsed.value = true;
+      usedItemNames.value = [...usedItemNames.value, itemResult.itemName];
+      availableItems.value = availableItems.value
+        .map(i => (i.name === itemResult.itemName ? { ...i, count: Math.max(0, i.count - 1) } : i))
+        .filter(i => i.count > 0);
+    }
     syncFromEngine();
+
+    if (engine.value.battleOver) {
+      handleBattleOver();
+    } else if (engine.value.getPendingForcedSwitch()?.side === 'ally') {
+      phase.value = 'forced_switch';
+    } else {
+      engine.value.planEnemyAction();
+      phase.value = 'selecting';
+    }
   }
 
   function skipItem() {
@@ -226,15 +253,7 @@ export const useBattleStore = defineStore('battle', () => {
     syncFromEngine();
 
     if (engine.value.battleOver) {
-      finalResult.value = engine.value.getResult(battleType.value);
-      if (finalResult.value!.winner === 'enemy') {
-        tryEnemyAutoCapture();
-      }
-      if (finalResult.value!.winner === 'ally' && battleType.value !== 'BOSS') {
-        phase.value = 'capture_prompt';
-      } else {
-        phase.value = 'result';
-      }
+      handleBattleOver();
     } else if (engine.value.getPendingForcedSwitch()?.side === 'ally') {
       phase.value = 'forced_switch';
     } else {
@@ -251,15 +270,7 @@ export const useBattleStore = defineStore('battle', () => {
     syncFromEngine();
 
     if (engine.value.battleOver) {
-      finalResult.value = engine.value.getResult(battleType.value);
-      if (finalResult.value!.winner === 'enemy') {
-        tryEnemyAutoCapture();
-      }
-      if (finalResult.value!.winner === 'ally' && battleType.value !== 'BOSS') {
-        phase.value = 'capture_prompt';
-      } else {
-        phase.value = 'result';
-      }
+      handleBattleOver();
       return;
     }
 
@@ -312,10 +323,7 @@ export const useBattleStore = defineStore('battle', () => {
 
     syncFromEngine();
 
-    if (rolled.success) {
-      finalResult.value = { ...engine.value.getResult(battleType.value), capture: rolled };
-      phase.value = 'result';
-    } else {
+    if (!rolled.success) {
       engine.value.applyCaptureFail();
       syncFromEngine();
       const escaped = engine.value.tryEnemyEscapeAfterFail();
@@ -327,12 +335,13 @@ export const useBattleStore = defineStore('battle', () => {
   }
 
   function skipCapture() {
-    finalResult.value = {
-      ...(engine.value?.getResult(battleType.value) ?? {}),
-      ...(capturePreview.value?.attempted ? { capture: capturePreview.value } : {}),
-      ...(enemyEscapedDuringCapture.value ? { enemyEscaped: true } : {}),
-    } as BattleResult;
-    phase.value = 'result';
+    recordCurrentCaptureIfAttempted();
+    startNextCaptureOrResult();
+  }
+
+  function confirmCaptureStep() {
+    recordCurrentCaptureIfAttempted();
+    startNextCaptureOrResult();
   }
 
   function resetCapturePreview() {
@@ -344,10 +353,89 @@ export const useBattleStore = defineStore('battle', () => {
     return {
       ...attempt,
       useTechAssist: hasTechAssist.value,
+      useMihunxiang: hasMihunxiang.value,
       enemyAffection: enemy.value?.好感度,
       enemyCorruption: enemy.value?.堕落值,
       enemyNature: enemy.value?.性格,
     };
+  }
+
+  function shuffleIndices(indices: number[]): number[] {
+    const result = [...indices];
+    for (let i = result.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [result[i], result[j]] = [result[j], result[i]];
+    }
+    return result;
+  }
+
+  function buildFinalResult(): BattleResult {
+    const base = engine.value?.getResult(battleType.value) ?? finalResult.value;
+    if (!base) {
+      throw new Error('战斗结果不存在');
+    }
+    const captures = completedCaptures.value;
+    const lastCapture = captures[captures.length - 1];
+    return {
+      ...base,
+      ...(lastCapture ? { capture: lastCapture.result } : {}),
+      ...(captures.length > 0 ? { captures: [...captures] } : {}),
+      ...(captures.some(c => c.enemyEscaped) ? { enemyEscaped: true } : {}),
+    };
+  }
+
+  function prepareVictoryCaptureQueue() {
+    if (!engine.value) return;
+    captureTargetQueue.value = shuffleIndices(engine.value.getDefeatedEnemyIndices()).slice(0, 2);
+  }
+
+  function startNextCaptureOrResult() {
+    if (!engine.value) return;
+    capturePreview.value = null;
+    enemyEscapedDuringCapture.value = false;
+
+    const nextIndex = captureTargetQueue.value.shift();
+    if (nextIndex === undefined) {
+      currentCaptureTargetIndex.value = null;
+      finalResult.value = buildFinalResult();
+      phase.value = 'result';
+      return;
+    }
+
+    currentCaptureTargetIndex.value = nextIndex;
+    engine.value.setCaptureTarget(nextIndex);
+    syncFromEngine();
+    phase.value = 'capture_prompt';
+  }
+
+  function recordCurrentCaptureIfAttempted() {
+    if (!engine.value || !capturePreview.value?.attempted || currentCaptureTargetIndex.value === null) return;
+    const target = engine.value.enemyTeam[currentCaptureTargetIndex.value];
+    if (!target) return;
+    completedCaptures.value = [
+      ...completedCaptures.value,
+      {
+        targetName: target.name,
+        result: capturePreview.value,
+        ...(enemyEscapedDuringCapture.value ? { enemyEscaped: true } : {}),
+      },
+    ];
+  }
+
+  function handleBattleOver() {
+    if (!engine.value) return;
+    finalResult.value = engine.value.getResult(battleType.value);
+    if (finalResult.value.winner === 'enemy') {
+      tryEnemyAutoCapture();
+      phase.value = 'result';
+      return;
+    }
+    if (finalResult.value.winner === 'ally') {
+      prepareVictoryCaptureQueue();
+      startNextCaptureOrResult();
+      return;
+    }
+    phase.value = 'result';
   }
 
   /** 敌方自动捕捉检定（我方战败时触发）——仅训练家战有效 */
@@ -374,6 +462,7 @@ export const useBattleStore = defineStore('battle', () => {
     battleType,
     location,
     hasTechAssist,
+    hasMihunxiang,
     ally,
     enemy,
     allyTeam,
@@ -386,6 +475,7 @@ export const useBattleStore = defineStore('battle', () => {
     finalResult,
     availableItems,
     itemUsed,
+    usedItemNames,
     forcedSwitchSide,
     usedItemName,
     isOver,
@@ -393,6 +483,10 @@ export const useBattleStore = defineStore('battle', () => {
     captureBalls,
     capturePreview,
     captureBallsUsed,
+    captureLastBallUsed,
+    enemyEscapedDuringCapture,
+    captureTargetQueue,
+    completedCaptures,
     initBattle,
     restartBattle,
     registerOnBattleEnd,
@@ -404,6 +498,7 @@ export const useBattleStore = defineStore('battle', () => {
     previewCapture,
     rollCapture,
     skipCapture,
+    confirmCaptureStep,
     resetCapturePreview,
     tryEnemyAutoCapture,
     confirmForcedSwitch,

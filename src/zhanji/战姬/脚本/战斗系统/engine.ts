@@ -6,6 +6,7 @@ import type {
   ActionResult,
   BattleCommand,
   BattleItem,
+  ItemUseResult,
   BattleLogEntry,
   BattleResult,
   BattleUnit,
@@ -50,7 +51,7 @@ const STAB_BONUS = 1.35;
 const BASE_CRIT_RATE = 0.0625;
 const CRIT_MULTIPLIER = 1.5;
 const DAMAGE_SCALE = 1.15;
-const MAX_ROUNDS = 25;
+const MAX_ROUNDS = 80;
 const SPEED_EXTRA_ACTION_CAP = 0.45;
 
 
@@ -168,7 +169,7 @@ function getTypeEffectiveness(atkElement: Element, defElement: Element): number 
 
 function inferFormula(skill: SkillData): EffectFormula {
   const f = skill.效果公式?.toLowerCase?.() ?? '';
-  if (['physical_damage', 'magic_damage', 'heal', 'buff', 'debuff', 'drain_physical', 'drain_magic'].includes(f)) {
+  if (['physical_damage', 'magic_damage', 'heal', 'buff', 'debuff', 'drain_physical', 'drain_magic', 'shield_damage'].includes(f)) {
     return f as EffectFormula;
   }
   const p = skill.数值参数 ?? {};
@@ -225,6 +226,16 @@ function getEffectiveStat(
   extraEffects: StatusEffect[] = [],
 ): number {
   let base = unit[stat];
+
+  const affection = unit.好感度;
+  if (affection != null) {
+    if (affection < 0) base = Math.floor(base * 0.70);
+    else if (affection < 50) base = Math.floor(base * 0.85);
+    else if (affection < 100) base = Math.floor(base * 1.0);
+    else if (affection < 150) base = Math.floor(base * 1.10);
+    else base = Math.floor(base * 1.20);
+  }
+
   const statMap: Record<string, StatusEffectType[]> = {
     攻击力: ['atk_up', 'atk_down'],
     防御力: ['def_up', 'def_down'],
@@ -410,6 +421,19 @@ function checkPassives(unit: BattleUnit, trigger: 'on_hit' | 'on_attack' | 'on_l
     if (trigger === 'on_attack' && p.暴击率加成) {
       triggered.push(`${passive.name}: 暴击率+${Math.floor(p.暴击率加成 * 100)}%`);
     }
+    if (trigger === 'on_hit' && p.护盾触发概率 && p.护盾触发概率 > 0) {
+      if (Math.random() < p.护盾触发概率) {
+        const byValue = p.护盾值 ?? 0;
+        const byRate = Math.floor(unit.HPMax * (p.护盾比例 ?? 0));
+        const shieldGranted = Math.max(0, byValue + byRate);
+        if (shieldGranted > 0) {
+          const cap = unit.shieldMax > 0 ? unit.shieldMax : unit.HPMax;
+          unit.shield = Math.min(Math.max(0, unit.shield + shieldGranted), cap);
+          tryApplyStatus(unit, 'shield', 1.0, Math.max(1, p.持续回合 ?? 2), unit.shield, passive.name);
+          triggered.push(`${passive.name}: 护盾+${shieldGranted}`);
+        }
+      }
+    }
   }
   return triggered;
 }
@@ -476,7 +500,7 @@ function buildStatusMessage(defender: BattleUnit, skill: SkillData, params: Skil
 
   for (const [key, type] of buffMap) {
     const v = params[key];
-    if (v && v > 0) {
+    if (v && v > 0 && formula !== 'debuff') {
       const target = formula === 'buff' ? defender : (attacker ?? defender);
       const s = tryApplyStatus(target, type, 1.0, duration, v, source);
       if (s) statusApplied.push(s);
@@ -484,9 +508,9 @@ function buildStatusMessage(defender: BattleUnit, skill: SkillData, params: Skil
   }
   for (const [key, type] of debuffMap) {
     const v = params[key];
-    if (v && v < 0) {
-      const target = formula === 'debuff' ? defender : (attacker ?? defender);
-      const s = tryApplyStatus(target, type, 1.0, duration, Math.abs(v), source);
+    if (v && v > 0 && formula === 'debuff') {
+      const target = defender;
+      const s = tryApplyStatus(target, type, 1.0, duration, v, source);
       if (s) statusApplied.push(s);
     }
   }
@@ -641,7 +665,7 @@ function executeSkill(
   const extraCrit = attacker.passives.reduce((sum, p) => sum + (p.数值参数?.暴击率加成 ?? 0), 0);
   const damageBoost = getDamageBoostMultiplier(attacker, attackerExtraEffects);
 
-  const isDamageSkill = ['physical_damage', 'magic_damage', 'drain_physical', 'drain_magic'].includes(formula);
+  const isDamageSkill = ['physical_damage', 'magic_damage', 'drain_physical', 'drain_magic', 'shield_damage'].includes(formula);
   const isHit = !isDamageSkill || Math.random() <= hitRate;
 
   if (!isHit) {
@@ -728,6 +752,28 @@ function executeSkill(
       const drainRatio = clamp(params.吸血比例 ?? 0.4, 0.1, 1.0);
       healed = Math.min(Math.floor(damage * drainRatio), attacker.HPMax - attacker.HP);
       attacker.HP += healed;
+      break;
+    }
+    case 'shield_damage': {
+      const defAsAtk = getEffectiveStat(attacker, '防御力', attackerExtraEffects);
+      const shieldBonus = params.护盾倍率 ? Math.floor(attacker.shield * params.护盾倍率) : 0;
+      const def = getEffectiveStat(defender, '防御力', defenderExtraEffects);
+      const r = calcDamage(
+        attacker.等级,
+        skill.基础威力 + shieldBonus,
+        defAsAtk,
+        def,
+        attacker.元素属性,
+        defender.元素属性,
+        skill.元素属性,
+        (params.暴击率加成 ?? 0) + extraCrit,
+        damageBoost,
+        defender.HPMax,
+        params.系数 ?? 0,
+      );
+      damage = r.damage;
+      isCritical = r.isCritical;
+      effectiveness = r.effectiveness;
       break;
     }
     case 'heal': {
@@ -836,6 +882,7 @@ export class BattleEngine {
   winner: 'ally' | 'enemy' | 'escape' | null = null;
   escapeAttempts = 0;
   itemUsed = false;
+  lastItemUseResult: ItemUseResult | null = null;
   consecutiveExtraCount: Record<'ally' | 'enemy', number> = { ally: 0, enemy: 0 };
 
   allyFieldBuffs: FieldBuff[] = [];
@@ -889,6 +936,19 @@ export class BattleEngine {
 
   getPendingForcedSwitch(): ForcedSwitchState | null {
     return this.pendingForcedSwitch;
+  }
+
+  setCaptureTarget(index: number): boolean {
+    if (!this.enemyTeam[index]) return false;
+    this.enemyActiveIndex = index;
+    return true;
+  }
+
+  getDefeatedEnemyIndices(): number[] {
+    return this.enemyTeam
+      .map((u, index) => ({ unit: u, index }))
+      .filter(x => this.isDefeated(x.unit))
+      .map(x => x.index);
   }
 
   private getTeam(side: 'ally' | 'enemy'): BattleUnit[] {
@@ -1211,6 +1271,10 @@ export class BattleEngine {
   }
 
   private normalizePlayerCommand(command: BattleCommand): BattleCommand {
+    if (command.action === 'item') {
+      return { action: 'item', item: command.item };
+    }
+
     if (command.action === 'switch') {
       if (this.canSwitch('ally', command.switchToIndex)) return command;
       return { action: 'skill', skillName: DEFAULT_ATTACK_SKILL.name, targetIndex: this.enemyActiveIndex };
@@ -1282,6 +1346,7 @@ export class BattleEngine {
     const playerCommand = this.normalizePlayerCommand(playerCommandRaw);
     const enemyCommand = this.enemyPlannedCommand ?? this.pickEnemySkillAndTarget().command;
     this.enemyPlannedCommand = null;
+    this.lastItemUseResult = null;
 
     for (const t of processStatusStartTurn(this.ally)) this.addLog('status', t.message);
     for (const t of processStatusStartTurn(this.enemy)) this.addLog('status', t.message);
@@ -1290,6 +1355,15 @@ export class BattleEngine {
       const esc = this.tryEscape('普通');
       if (!esc.success) this.processEndOfTurn();
       return actions;
+    }
+
+    const allyUsesItem = playerCommand.action === 'item';
+    if (allyUsesItem) {
+      if (playerCommand.item) {
+        this.useItem(playerCommand.item);
+      } else {
+        this.addLog('system', '没有选择道具');
+      }
     }
 
     const sideSkippedBySwitch: Record<'ally' | 'enemy', boolean> = { ally: false, enemy: false };
@@ -1308,7 +1382,7 @@ export class BattleEngine {
 
     const allyUnit = this.ally;
     const enemyUnit = this.enemy;
-    const allySkill = sideSkippedBySwitch.ally ? null : this.resolveSkillByName(allyUnit, playerCommand.skillName);
+    const allySkill = sideSkippedBySwitch.ally || allyUsesItem ? null : this.resolveSkillByName(allyUnit, playerCommand.skillName);
     const enemySkill = sideSkippedBySwitch.enemy ? null : this.resolveSkillByName(enemyUnit, enemyCommand.skillName);
 
     const allySpeed = getEffectiveStat(allyUnit, '速度', this.getFieldEffectStatuses('ally'));
@@ -1325,6 +1399,10 @@ export class BattleEngine {
       if (sideSkippedBySwitch[attackerSide]) continue;
 
       const attacker = this.getActive(attackerSide);
+      if (attackerSide === 'ally' && allyUsesItem) {
+        this.consumeActionCooldowns(attacker);
+        continue;
+      }
       if (this.isDefeated(attacker)) {
         this.requestForcedSwitch(attackerSide, 'defeated');
         this.checkWinner();
@@ -1504,8 +1582,7 @@ export class BattleEngine {
     return [...unit.statusEffects.map(e => ({ ...e })), ...this.getFieldEffectStatuses(side).map(e => ({ ...e }))];
   }
 
-  useItem(item: BattleItem): string {
-    if (this.itemUsed) return '已经使用过道具了！';
+  useItem(item: BattleItem): ItemUseResult {
     this.itemUsed = true;
 
     switch (item.category) {
@@ -1513,13 +1590,15 @@ export class BattleEngine {
         tryApplyStatus(this.ally, 'damage_boost', 1.0, 5, 0.1, item.name);
         const msg = `使用了 ${item.name}，最终伤害提升10%，持续5回合`;
         this.addLog('item', msg);
-        return msg;
+        this.lastItemUseResult = { ok: true, message: msg, itemName: item.name };
+        return this.lastItemUseResult;
       }
       case '技能增强药': {
         tryApplyStatus(this.ally, 'skill_boost', 1.0, 3, 0.3, item.name);
         const msg = `使用了 ${item.name}，技能伤害提升30%，持续3回合`;
         this.addLog('item', msg);
-        return msg;
+        this.lastItemUseResult = { ok: true, message: msg, itemName: item.name };
+        return this.lastItemUseResult;
       }
       case '伤药': {
         const ratioMap = { 初级: 0.2, 中级: 0.5, 高级: 1.0 };
@@ -1529,10 +1608,12 @@ export class BattleEngine {
         this.ally.HP += actual;
         const msg = `使用了 ${item.name}，恢复了 ${actual} HP`;
         this.addLog('item', msg);
-        return msg;
+        this.lastItemUseResult = { ok: true, message: msg, itemName: item.name };
+        return this.lastItemUseResult;
       }
       default:
-        return '未知道具';
+        this.lastItemUseResult = { ok: false, message: '未知道具' };
+        return this.lastItemUseResult;
     }
   }
 
@@ -1623,14 +1704,16 @@ export class BattleEngine {
     }
 
     const techMod = attempt.useTechAssist ? 0.15 : 0;
+    const mihunxiangMod = attempt.useMihunxiang ? 0.15 : 0;
     const resistMod = calcResistMod(attempt.enemyAffection, attempt.enemyCorruption, attempt.enemyNature);
 
-    const finalRate = clamp(baseRate * ballMultiplier + techMod + statusMod - resistMod, 0, 1);
+    const finalRate = clamp(baseRate * ballMultiplier + techMod + mihunxiangMod + statusMod - resistMod, 0, 1);
 
     const parts: string[] = [];
     parts.push(`基础率${Math.round(baseRate * 100)}%(${quality}级)`);
     parts.push(`×球${ballMultiplier}`);
-    if (techMod) parts.push(`+道具${Math.round(techMod * 100)}%`);
+    if (techMod) parts.push(`+辅助器${Math.round(techMod * 100)}%`);
+    if (mihunxiangMod) parts.push(`+迷魂香${Math.round(mihunxiangMod * 100)}%`);
     if (statusMod) parts.push(`+状态${Math.round(statusMod * 100)}%`);
     if (resistMod) parts.push(`-抵抗${Math.round(resistMod * 100)}%`);
     parts.push(`=最终${Math.round(finalRate * 100)}%`);
@@ -1643,6 +1726,7 @@ export class BattleEngine {
       baseRate,
       ballMultiplier,
       techMod,
+      mihunxiangMod,
       statusMod,
       resistMod,
       detailText,
@@ -1736,14 +1820,18 @@ export class BattleEngine {
     const allyTeamState: TeamUnitState[] = this.allyTeam.map(u => ({
       name: u.name,
       HP: u.HP,
+      HPMax: u.HPMax,
       MP: u.MP,
+      MPMax: u.MPMax,
       isDefeated: u.HP <= 0,
     }));
 
     const enemyTeamState: TeamUnitState[] = this.enemyTeam.map(u => ({
       name: u.name,
       HP: u.HP,
+      HPMax: u.HPMax,
       MP: u.MP,
+      MPMax: u.MPMax,
       isDefeated: u.HP <= 0,
     }));
 

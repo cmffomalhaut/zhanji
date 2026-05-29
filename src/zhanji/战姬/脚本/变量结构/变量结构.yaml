@@ -133,6 +133,7 @@ const SkillSchema = z.object({
   基础威力: z.coerce.number().prefault(0),
   描述: z.string().prefault(''),
   效果公式: z.string().prefault(''),
+  目标类型: z.string().prefault(''),
   数值参数: z.record(z.string(), z.coerce.number()).prefault({})
 });
 
@@ -471,66 +472,6 @@ export const Schema = z.object({
       }
     }
   }
-
-  // ====== 日常结算检测 ======
-  const currentDate = data.世界.日期;
-  const lastSettlementDate = data.世界._上次结算日期 || currentDate;
-
-  if (currentDate !== lastSettlementDate) {
-    console.log(`[日常结算] 检测到日期变化: ${lastSettlementDate} → ${currentDate}`);
-
-    // ====== 收藏室结算 ======
-    if (data.训练家.据点.已解锁 && data.训练家.据点.收藏室.已解锁) {
-      const collectionRoom = data.训练家.据点.收藏室;
-      if (collectionRoom.等级 > 0 && collectionRoom.当前使用.length > 0) {
-        const affectionBonus = RULES.COLLECTION_AFFECTION_BONUS[collectionRoom.等级] || 0;
-
-        for (const senkiName of collectionRoom.当前使用) {
-          if (data.角色数据[senkiName]) {
-            const char = data.角色数据[senkiName];
-            const oldAffection = char.好感度;
-            char.好感度 = _.clamp(oldAffection + affectionBonus, -100, 200);
-            console.log(`  [收藏室] ${senkiName} 好感度 +${affectionBonus} (${oldAffection} → ${char.好感度})`);
-
-            // 恢复30%HP/MP
-            const hpRecover = Math.floor(char.生命值.最大值 * 0.3);
-            const mpRecover = Math.floor(char.法力值.最大值 * 0.3);
-            char.生命值.当前值 = _.clamp(char.生命值.当前值 + hpRecover, 0, char.生命值.最大值);
-            char.法力值.当前值 = _.clamp(char.法力值.当前值 + mpRecover, 0, char.法力值.最大值);
-            console.log(`  [收藏室] ${senkiName} HP恢复 +${hpRecover}, MP恢复 +${mpRecover}`);
-          }
-        }
-      }
-    }
-
-    // ====== 工作区结算 ======
-    if (data.训练家.据点.已解锁 && data.训练家.据点.工作区.已解锁) {
-      const workArea = data.训练家.据点.工作区;
-      if (workArea.等级 > 0 && workArea.当前使用.length > 0) {
-        const incomePerPerson = workArea.效果数值 || RULES.WORK_AREA_INCOME[workArea.等级] || 0;
-        const totalIncome = incomePerPerson * workArea.当前使用.length;
-
-        data.金币 += totalIncome;
-        console.log(`  [工作区] 产出金币 +${totalIncome} (${incomePerPerson}/人 × ${workArea.当前使用.length}人)`);
-      }
-    }
-
-    // ====== 更新结算日期 ======
-    data.世界._上次结算日期 = currentDate;
-    console.log(`[日常结算] 完成，更新结算日期为 ${currentDate}`);
-  }
-
-  // ====== 收藏室列表自动维护 ======
-  const 储存列表 = [];
-  for (const name in data.角色数据) {
-    const char = data.角色数据[name];
-    if (char.从属训练家 === data.玩家名 || char.从属训练家 === '') {
-      if (char.归属状态 === '已储存') {
-        储存列表.push(name);
-      }
-    }
-  }
-  data.收藏室 = 储存列表;
 
   // ====== 自动事件 ======
   if (data.current_target && !data.current_event) {

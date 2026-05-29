@@ -22,6 +22,7 @@
       width: 100%;
       aspect-ratio: 9 / 12;
       max-width: 100%;
+      max-height: 600px;
       display: flex;
       flex-direction: column;
       background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
@@ -545,6 +546,43 @@
       border-radius: 5px;
       font-family: monospace;
     }
+    .slot-badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #334155;
+      color: #e2e8f0;
+      font-weight: bold;
+      display: inline-block;
+    }
+    .skill-card.mythic {
+      border-left-color: #ef4444;
+      box-shadow: 0 0 8px rgba(239,68,68,0.3);
+    }
+    .slot-type-hint {
+      font-size: 10px;
+      color: #64748b;
+      margin-bottom: 3px;
+    }
+    .btn-refresh-skill {
+      background: none;
+      border: 1px solid #475569;
+      color: #94a3b8;
+      cursor: pointer;
+      font-size: 12px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      line-height: 1;
+    }
+    .btn-refresh-skill:hover {
+      background: rgba(99,102,241,0.2);
+      border-color: #6366f1;
+      color: #a5b4fc;
+    }
+    .btn-gen-skills:disabled, .btn-refresh-skill:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
     .skill-unlock {
       font-size: 10px;
       color: #ef4444;
@@ -877,6 +915,45 @@
       color: #94a3b8;
     }
 
+    .senki-store-btn {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      border: none; color: #1a1a2e; font-size: 13px; font-weight: bold;
+      padding: 5px 12px; border-radius: 8px; cursor: pointer; flex-shrink: 0;
+      margin-right: 4px;
+    }
+    .senki-store-btn:active { transform: scale(0.95); opacity: 0.8; }
+    .senki-store-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+    .senki-wh-entry {
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(79, 70, 229, 0.08) 100%);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .senki-wh-name { font-size: 14px; font-weight: bold; color: #e0e7ff; }
+    .senki-wh-info { font-size: 10px; color: #94a3b8; margin-top: 2px; }
+    .senki-wh-actions { display: flex; gap: 4px; flex-shrink: 0; }
+    .senki-wh-btn {
+      border: none; font-size: 11px; font-weight: bold; padding: 4px 8px;
+      border-radius: 5px; cursor: pointer;
+    }
+    .senki-wh-btn:active { transform: scale(0.95); opacity: 0.8; }
+    .senki-wh-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+    .senki-wh-withdraw { background: linear-gradient(135deg, #22c55e, #16a34a); color: white; }
+    .senki-wh-collection { background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; }
+    .senki-wh-work { background: linear-gradient(135deg, #f59e0b, #d97706); color: #1a1a2e; }
+    .senki-wh-unassign { background: rgba(255,255,255,0.15); color: #94a3b8; }
+    .senki-fac-badge {
+      display: inline-block; font-size: 10px; padding: 2px 4px; border-radius: 3px;
+      font-weight: bold; margin-left: 6px;
+    }
+    .sfb-collection { background: #3b82f6; color: white; }
+    .sfb-work { background: #f59e0b; color: #1a1a2e; }
+    .sfb-none { background: #475569; color: #94a3b8; }
+
     .bottom-nav {
       height: 60px;
       background: linear-gradient(180deg, #0f3460 0%, #16213e 100%);
@@ -1021,6 +1098,7 @@
 
     let pendingPurchase = null;
 let warehouseData = {};
+    let senkiWarehouseData = {};
     let pendingWhAction = null;
     let pendingDestroyAction = null;
     let pendingDeleteQuestId = null;
@@ -1258,10 +1336,16 @@ var DAILY_QUEST_POOL = [
   $('#top-gold').text(goldVal);
 
   loadWarehouseData();
+  loadSenkiWarehouseData();
   renderCurrentTab();
 }
 
     function renderCurrentTab() {
+      if (currentView === 'senki-wh') {
+        loadSenkiWarehouseData();
+        renderSenkiWarehousePanel($('#panel-senki-warehouse .list-scroll'));
+        return;
+      }
       if (currentView === 'list') {
         renderList(currentTab);
       } else if (currentView === 'detail' && selectedCharName) {
@@ -1427,6 +1511,22 @@ function renderCharsList($scroll) {
         </div>
       `;
 
+      var swhCount = 0;
+      try { swhCount = Object.keys(senkiWarehouseData).length; } catch(e) { swhCount = 0; }
+      var battleCount = 0;
+      try { battleCount = Object.values(_.get(currentData, '角色数据', {})).filter(function(c) { return c.归属状态 === '出战'; }).length; } catch(e) { battleCount = 0; }
+      var collectionCount = _.get(base, '收藏室.当前使用', []).length || 0;
+      var workCount = _.get(base, '工作区.当前使用', []).length || 0;
+      html += `
+        <div class="warehouse-entry" id="btn-senki-warehouse" style="background:linear-gradient(135deg, rgba(99,102,241,0.15), rgba(79,70,229,0.08));border-color:rgba(99,102,241,0.3);">
+          <div>
+            <div style="font-size:15px;font-weight:bold;color:#a5b4fc;">🏰 战姬仓库</div>
+            <div style="font-size:10px;color:#94a3b8;margin-top:2px;">仓库: ${swhCount}只 | 出战: ${battleCount}只 · 收藏室${collectionCount} · 工作区${workCount}</div>
+          </div>
+          <div style="font-size:18px;color:#a5b4fc;">→</div>
+        </div>
+      `;
+
       html += `
         <div class="section">
           <div class="section-head" data-section="equips"><span>💎 特殊装备 (最多3个)</span><span class="toggle-icon">▼</span></div>
@@ -1501,14 +1601,18 @@ function renderCharsList($scroll) {
         const collectionCapacity = _.get(collectionRoom, '容量上限', 0);
         const collectionEffect = _.get(collectionRoom, '当前效果', '');
         const collectionAffection = _.get(collectionRoom, '每日好感加成', 0);
+        const collectionUsers = _.get(collectionRoom, '当前使用', []);
 
-        /* ✅ 从角色数据中筛选归属状态='已储存'的战姬，优化判断逻辑 */
-        const storedCharList = Object.entries(chars)
-          .filter(([name, d]) => {
-            const owner = (d.从属训练家 || '').trim();
-            return d.归属状态 === '已储存' && (owner === playerName || owner === '');
-          })
-          .map(([name, d]) => ({ name, data: d }));
+        /* ✅ 从收藏室名单+战姬仓库获取战姬摘要信息 */
+        var storedCharList = [];
+        collectionUsers.forEach(function(n) {
+          var whData = _.get(senkiWarehouseData, n + '.数据');
+          if (whData) {
+            storedCharList.push({ name: n, data: whData });
+          } else {
+            storedCharList.push({ name: n, data: { 品质: '?', 等级: '?' } });
+          }
+        });
 
         html += `
           <div class="collection-cabinet">
@@ -1771,6 +1875,28 @@ function renderCharsList($scroll) {
         replaceVariables(chatVars, { type: 'chat' });
       } catch(e) {
         console.error('保存仓库数据失败:', e);
+        throw e;
+      }
+    }
+
+    function loadSenkiWarehouseData() {
+      try {
+        const chatVars = getVariables({ type: 'chat' });
+        senkiWarehouseData = _.get(chatVars, '战姬仓库', {});
+        if (typeof senkiWarehouseData !== 'object' || senkiWarehouseData === null) senkiWarehouseData = {};
+      } catch(e) {
+        console.warn('加载战姬仓库失败:', e);
+        senkiWarehouseData = {};
+      }
+    }
+
+    function saveSenkiWarehouseData() {
+      try {
+        const chatVars = getVariables({ type: 'chat' }) || {};
+        chatVars['战姬仓库'] = senkiWarehouseData;
+        replaceVariables(chatVars, { type: 'chat' });
+      } catch(e) {
+        console.error('保存战姬仓库失败:', e);
         throw e;
       }
     }
@@ -2220,6 +2346,224 @@ function renderCharsList($scroll) {
       }
     }
 
+    // ========== 战姬仓库 ==========
+
+    function getSenkiFacBadge(pos) {
+      var map = { '收藏室': ['sfb-collection', '📦收藏室'], '工作区': ['sfb-work', '💼工作区'], '仓库': ['sfb-none', '📋仓库'] };
+      var info = map[pos] || ['sfb-none', '📋' + (pos || '无')];
+      return '<span class="senki-fac-badge ' + info[0] + '">' + info[1] + '</span>';
+    }
+
+    function showSenkiWarehouse() {
+      currentView = 'senki-wh';
+      selectedCharName = null;
+      $('.nav-item').removeClass('active');
+      $('#nav-trainer').addClass('active');
+      $('.list-panel').removeClass('active');
+      $('#detail-panel').removeClass('active');
+      $('#panel-senki-warehouse').addClass('active');
+      loadSenkiWarehouseData();
+      renderSenkiWarehousePanel($('#panel-senki-warehouse .list-scroll'));
+    }
+
+    function renderSenkiWarehousePanel($scroll) {
+      var isLatest = getCurrentMessageId() === getLastMessageId();
+      var disabledAttr = isLatest ? '' : ' disabled title="请在最新楼层操作"';
+      var whNames = Object.keys(senkiWarehouseData);
+      var chars = _.get(currentData, '角色数据', {});
+      var collectionRoom = _.get(currentData, '训练家.据点.收藏室', {});
+      var workArea = _.get(currentData, '训练家.据点.工作区', {});
+
+      var html = '';
+      html += '<div class="list-header" style="justify-content:flex-start;gap:8px;">' +
+        '<button class="back-btn" id="btn-swh-back">← 返回</button>' +
+        '<span>🏰 战姬仓库</span>' +
+        '<span style="font-size:11px;color:#94a3b8;margin-left:auto;">仓库不占AI上下文</span>' +
+        '</div>';
+
+      if (!isLatest) {
+        html += '<div style="background:rgba(234,179,8,0.15);color:#fbbf24;padding:8px 12px;border-radius:6px;font-size:12px;text-align:center;margin-bottom:8px;">⚠ 非最新楼层，存取已禁用</div>';
+      }
+
+      html += '<div class="wh-header">🏰 仓库中 (' + whNames.length + '只)</div>';
+      if (whNames.length === 0) {
+        html += '<div class="list-empty" style="padding:16px;">仓库暂无战姬</div>';
+      } else {
+        whNames.forEach(function(name) {
+          var stored = senkiWarehouseData[name];
+          var charData = stored.数据 || {};
+          var pos = stored.位置 || '仓库';
+          var quality = charData.品质 || 'E';
+          var level = charData.等级 || 1;
+          html += '<div class="senki-wh-entry">' +
+            '<div>' +
+            '<div class="senki-wh-name">' + name + getSenkiFacBadge(pos) + '</div>' +
+            '<div class="senki-wh-info">' + quality + '级 Lv.' + level + ' · ' + (charData.元素属性 || '无') + '属性</div>' +
+            '</div>' +
+            '<div class="senki-wh-actions">' +
+            '<button class="senki-wh-btn senki-wh-withdraw"' + disabledAttr + ' data-swh-name="' + name + '">取出</button>' +
+            (pos !== '收藏室' ? '<button class="senki-wh-btn senki-wh-collection"' + disabledAttr + ' data-swh-name="' + name + '" data-swh-fac="collection">收藏室</button>' : '<button class="senki-wh-btn senki-wh-unassign"' + disabledAttr + ' data-swh-name="' + name + '" data-swh-fac="unassign">取消</button>') +
+            (pos !== '工作区' ? '<button class="senki-wh-btn senki-wh-work"' + disabledAttr + ' data-swh-name="' + name + '" data-swh-fac="work">工作区</button>' : '<button class="senki-wh-btn senki-wh-unassign"' + disabledAttr + ' data-swh-name="' + name + '" data-swh-fac="unassign">取消</button>') +
+            '</div></div>';
+        });
+      }
+
+      var battleChars = [];
+      Object.entries(chars).forEach(function(e) {
+        var d = e[1];
+        if (d.归属状态 === '出战' && (d.从属训练家 === currentData.玩家名 || !d.从属训练家)) {
+          battleChars.push({ name: e[0], data: d });
+        }
+      });
+
+      html += '<div class="wh-header">⚔️ 可存入 (' + battleChars.length + '只)</div>';
+      if (battleChars.length === 0) {
+        html += '<div class="list-empty" style="padding:16px;">无出战战姬可存入</div>';
+      } else {
+        battleChars.forEach(function(c) {
+          html += '<div class="senki-wh-entry">' +
+            '<div>' +
+            '<div class="senki-wh-name">⚔️ ' + c.name + '</div>' +
+            '<div class="senki-wh-info">' + (c.data.品质 || 'E') + '级 Lv.' + (c.data.等级 || 1) + ' · ' + (c.data.元素属性 || '无') + '属性</div>' +
+            '</div>' +
+            '<div style="flex-shrink:0;">' +
+            '<button class="senki-wh-btn wh-deposit-btn"' + disabledAttr + ' data-swh-deposit="' + c.name + '">存入</button>' +
+            '</div></div>';
+        });
+      }
+
+      $scroll.html(html);
+
+      $scroll.off('click.swhBack').on('click.swhBack', '#btn-swh-back', function() {
+        switchTab('trainer');
+      });
+      $scroll.off('click.swhWithdraw').on('click.swhWithdraw', '.senki-wh-withdraw', function(e) {
+        e.stopPropagation();
+        withdrawSenki($(this).data('swh-name'));
+      });
+      $scroll.off('click.swhAssign').on('click.swhAssign', '.senki-wh-collection, .senki-wh-work, .senki-wh-unassign', function(e) {
+        e.stopPropagation();
+        var name = $(this).data('swh-name');
+        var fac = $(this).data('swh-fac');
+        assignSenkiToFacility(name, fac);
+      });
+      $scroll.off('click.swhDeposit').on('click.swhDeposit', '.senki-wh-btn[data-swh-deposit]', function(e) {
+        e.stopPropagation();
+        depositSenki($(this).data('swh-deposit'));
+      });
+    }
+
+    async function depositSenki(name) {
+      if (getCurrentMessageId() !== getLastMessageId()) { notify('请在最新楼层操作', 'warning'); return; }
+      var charData = _.get(currentData, '角色数据.' + name);
+      if (!charData) { notify('战姬数据不存在', 'error'); return; }
+      try {
+        if (typeof updateVariablesWith !== 'function') { notify('变量更新不可用', 'error'); return; }
+        var charClone = JSON.parse(JSON.stringify(charData));
+        await updateVariablesWith(function(variables) {
+          _.unset(variables, 'stat_data.角色数据.' + name);
+          return variables;
+        }, { type: 'message' });
+        delete currentData.角色数据[name];
+        senkiWarehouseData[name] = { 数据: charClone, 位置: '仓库' };
+        saveSenkiWarehouseData();
+        notify(name + ' 已存入战姬仓库', 'success');
+      } catch(e) {
+        console.error('存入战姬失败:', e);
+        notify('存入失败，请重试', 'error');
+        return;
+      }
+      loadSenkiWarehouseData();
+      renderCurrentTab();
+    }
+
+    async function withdrawSenki(name) {
+      if (getCurrentMessageId() !== getLastMessageId()) { notify('请在最新楼层操作', 'warning'); return; }
+      var stored = senkiWarehouseData[name];
+      if (!stored || !stored.数据) { notify('仓库中无此战姬数据', 'error'); return; }
+      try {
+        if (typeof updateVariablesWith !== 'function') { notify('变量更新不可用', 'error'); return; }
+        var charClone = JSON.parse(JSON.stringify(stored.数据));
+        charClone.归属状态 = '出战';
+        var fac = stored.位置;
+        await updateVariablesWith(function(variables) {
+          _.set(variables, 'stat_data.角色数据.' + name, charClone);
+          if (fac === '收藏室') {
+            var list = _.get(variables, 'stat_data.训练家.据点.收藏室.当前使用', []);
+            _.set(variables, 'stat_data.训练家.据点.收藏室.当前使用', list.filter(function(n) { return n !== name; }));
+          }
+          if (fac === '工作区') {
+            var wlist = _.get(variables, 'stat_data.训练家.据点.工作区.当前使用', []);
+            _.set(variables, 'stat_data.训练家.据点.工作区.当前使用', wlist.filter(function(n) { return n !== name; }));
+          }
+          return variables;
+        }, { type: 'message' });
+        currentData.角色数据[name] = charClone;
+        if (fac === '收藏室') {
+          var cl = _.get(currentData, '训练家.据点.收藏室.当前使用', []);
+          _.set(currentData, '训练家.据点.收藏室.当前使用', cl.filter(function(n) { return n !== name; }));
+        }
+        if (fac === '工作区') {
+          var wl = _.get(currentData, '训练家.据点.工作区.当前使用', []);
+          _.set(currentData, '训练家.据点.工作区.当前使用', wl.filter(function(n) { return n !== name; }));
+        }
+        delete senkiWarehouseData[name];
+        saveSenkiWarehouseData();
+        notify(name + ' 已取回至出战队伍', 'success');
+      } catch(e) {
+        console.error('取出战姬失败:', e);
+        notify('取出失败，请重试', 'error');
+        return;
+      }
+      loadSenkiWarehouseData();
+      renderCurrentTab();
+    }
+
+    async function assignSenkiToFacility(name, facility) {
+      if (getCurrentMessageId() !== getLastMessageId()) { notify('请在最新楼层操作', 'warning'); return; }
+      var stored = senkiWarehouseData[name];
+      if (!stored) { notify('仓库中无此战姬', 'error'); return; }
+      try {
+        if (typeof updateVariablesWith !== 'function') { notify('变量更新不可用', 'error'); return; }
+        var oldFac = stored.位置 || '仓库';
+
+        await updateVariablesWith(function(variables) {
+          if (oldFac === '收藏室') {
+            var list = _.get(variables, 'stat_data.训练家.据点.收藏室.当前使用', []);
+            _.set(variables, 'stat_data.训练家.据点.收藏室.当前使用', list.filter(function(n) { return n !== name; }));
+          }
+          if (oldFac === '工作区') {
+            var wlist = _.get(variables, 'stat_data.训练家.据点.工作区.当前使用', []);
+            _.set(variables, 'stat_data.训练家.据点.工作区.当前使用', wlist.filter(function(n) { return n !== name; }));
+          }
+          if (facility === 'collection') {
+            var clist = _.get(variables, 'stat_data.训练家.据点.收藏室.当前使用', []);
+            if (clist.indexOf(name) < 0) clist.push(name);
+            _.set(variables, 'stat_data.训练家.据点.收藏室.当前使用', clist);
+          }
+          if (facility === 'work') {
+            var wlist2 = _.get(variables, 'stat_data.训练家.据点.工作区.当前使用', []);
+            if (wlist2.indexOf(name) < 0) wlist2.push(name);
+            _.set(variables, 'stat_data.训练家.据点.工作区.当前使用', wlist2);
+          }
+          return variables;
+        }, { type: 'message' });
+
+        var newFac = facility === 'collection' ? '收藏室' : (facility === 'work' ? '工作区' : '仓库');
+        senkiWarehouseData[name].位置 = newFac;
+        saveSenkiWarehouseData();
+
+        var facNames = { 'collection': '收藏室', 'work': '工作区', 'unassign': '仓库' };
+        notify(name + ' 已分配到 ' + (facNames[facility] || '仓库'), 'success');
+      } catch(e) {
+        console.error('分配战姬失败:', e);
+        notify('分配失败，请重试', 'error');
+        return;
+      }
+      loadSenkiWarehouseData();
+      renderCurrentTab();
+    }
+
     function switchTab(tab) {
       currentTab = tab;
       currentView = 'list';
@@ -2305,13 +2649,15 @@ function renderCharsList($scroll) {
 
     function getRarityTag(rarity) {
       const map = {
+        'N': 'sr-normal',
         '普通': 'sr-normal',
         '稀有': 'sr-rare',
         '史诗': 'sr-epic',
         '传说': 'sr-legend',
         '神话': 'sr-myth'
       };
-      return `<span class="skill-rarity ${map[rarity] || 'sr-normal'}">${rarity || '普通'}</span>`;
+      const displayMap = { 'N': 'N', '普通': '普通', '稀有': '稀有', '史诗': '史诗', '传说': '传说', '神话': '神话' };
+      return `<span class="skill-rarity ${map[rarity] || 'sr-normal'}">${displayMap[rarity] || rarity || '普通'}</span>`;
     }
 
     function renderCharDetail(name) {
@@ -2334,6 +2680,15 @@ function renderCharsList($scroll) {
         ownerHtml += `<div class="char-owner">👤 隶属于 <span class="owner-name">${owner}</span></div>`;
       }
       $('#detail-owner').html(ownerHtml);
+
+      var isAllyChar = (owner === '' || owner === playerName);
+      var isLatest = getCurrentMessageId() === getLastMessageId();
+      var shopDisabled = isLatest ? '' : ' disabled title="请在最新楼层操作"';
+      if (isAllyChar && data.归属状态 === '出战') {
+        $('#detail-actions').html('<button class="senki-store-btn" id="btn-store-senki"' + shopDisabled + '>📦 存入仓库</button>');
+      } else {
+        $('#detail-actions').html('');
+      }
 
       let html = '';
 
@@ -2441,25 +2796,43 @@ function renderCharsList($scroll) {
       `;
       const skillEntries = Object.entries(skills);
       if (skillEntries.length === 0) {
-        html += '<div style="color:#64748b; font-size:11px; padding:6px;">暂无技能</div>';
+        html += `
+          <div style="text-align:center;padding:10px;">
+            <div style="color:#64748b;font-size:11px;margin-bottom:8px;">暂无技能</div>
+            <button class="btn-gen-skills" data-char-name="${name}" style="padding:6px 16px;font-size:12px;background:#6366f1;color:#fff;border:none;border-radius:4px;cursor:pointer;${!isLatest ? 'opacity:0.5;' : ''}" ${!isLatest ? 'disabled' : ''}>⚡ 生成技能</button>
+          </div>
+        `;
       } else {
-        skillEntries.forEach(([skillName, skill]) => {
+        const sortedEntries = [...skillEntries].sort(([a], [b]) => {
+          const na = parseInt(a.replace('槽位_', ''), 10);
+          const nb = parseInt(b.replace('槽位_', ''), 10);
+          return (!isNaN(na) ? na : 999) - (!isNaN(nb) ? nb : 999);
+        });
+        sortedEntries.forEach(([skillKey, skill]) => {
+          const slotNum = parseInt(skillKey.replace('槽位_', ''), 10);
+          const label = window.SLOT_LABELS && window.SLOT_LABELS[slotNum];
           const typeTag = getSkillTypeTag(skill.类型);
           const rarityTag = getRarityTag(skill.稀有度);
           const mp = skill.消耗MP || 0;
           const cd = skill.冷却回合 || 0;
           const power = skill.基础威力 || 0;
+          const displayName = skill.name || skillKey;
 
           html += `
-            <div class="skill-card">
+            <div class="skill-card${skill.稀有度 === '神话' ? ' mythic' : ''}">
               <div class="skill-header">
-                <div class="skill-name">${typeTag} ${rarityTag} ${skillName}</div>
-                <div  class="skill-meta">
+                <div class="skill-name">
+                  ${label ? `<span class="slot-badge">${label.name}</span>` : ''}
+                  ${typeTag} ${rarityTag} ${displayName}
+                </div>
+                <div class="skill-meta">
                   ${mp > 0 ? `<span class="skill-mp">💧${mp}</span>` : ''}
                   ${cd > 0 ? `<span class="skill-cd">⏱️CD:${cd}</span>` : ''}
                   ${power > 0 ? `<span style="font-size:10px;color:#f59e0b;font-weight:bold;">💥${power}</span>` : ''}
+                  <button class="btn-refresh-skill" data-char-name="${name}" data-slot-key="${skillKey}" title="重铸此技能" style="margin-left:4px;${!isLatest ? 'opacity:0.5;pointer-events:none;' : ''}" ${!isLatest ? 'disabled' : ''}>🔄</button>
                 </div>
               </div>
+              ${label ? `<div class="slot-type-hint">${label.desc}</div>` : ''}
               <div class="skill-desc">${skill.描述 || '无描述'}</div>
               ${skill.效果公式 ? `<div class="skill-formula">📐 ${skill.效果公式}</div>` : ''}
             </div>
@@ -2624,6 +2997,246 @@ function renderCharsList($scroll) {
       collapsedCategories[category] = $head.hasClass('collapsed');
     }
 
+    // === 技能生成系统 ===
+    window.SKILL_RARITY_ORDER = ['N', '普通', '稀有', '史诗', '传说', '神话'];
+    window.SKILL_PARAM_KEYS = ['系数','伤害类型','暴击率加成','吸血比例','命中率','灼烧概率','灼烧伤害','灼烧回合','中毒概率','中毒伤害','中毒回合','冰冻概率','冰冻回合','麻痹概率','麻痹回合','混乱概率','混乱回合','攻击加成','防御加成','特攻加成','特防加成','速度加成','命中加成','闪避加成','持续回合','治疗量','治疗比例','护盾值','护盾比例'];
+    window.SLOT_LABELS = {
+      1: { name: 'Ⅰ', desc: '低消耗攻击' },
+      2: { name: 'Ⅱ', desc: '' },
+      3: { name: 'Ⅲ', desc: '' },
+      4: { name: 'Ⅳ', desc: '' },
+      5: { name: 'Ⅴ', desc: '' },
+      6: { name: 'Ⅵ', desc: '' }
+    };
+
+    function getMaxRarity(quality) {
+      var map = { E: '普通', D: '稀有', C: '史诗', B: '传说', A: '传说', S: '神话', SS: '神话', SSS: '神话' };
+      return map[quality] || '普通';
+    }
+
+    function getSkillSlotCount() {
+      return 6;
+    }
+
+    function rollPassive(slotIndex) {
+      if (slotIndex === 1) return false;
+      return Math.random() < 0.25;
+    }
+
+    function buildSlotPrompt(charData, slotIndex, maxRarity, isPassive) {
+      var element = charData.属性 || '无';
+      var combatType = charData.战斗类型 || '均衡型';
+      var quality = charData.品质 || 'E';
+      var name = charData.名称 || '角色';
+      var atk = charData.攻击力 || 0;
+      var spa = charData.特攻 || 0;
+      var isPhysical = atk >= spa;
+      var firstFormula = isPhysical ? 'physical_damage' : 'magic_damage';
+      var firstElement = isPhysical ? '无' : element;
+      var label = window.SLOT_LABELS[slotIndex];
+      var slotMaxRarity = slotIndex === 1 ? '史诗' : maxRarity;
+
+      var slotLine = '### 槽位 ' + slotIndex + (label ? ' (' + label.name + ')' : '') + '\n';
+      if (slotIndex === 1) {
+        slotLine += '【固定攻击位】\n- 元素属性=' + firstElement + ' (强制)\n- 类型=主动 (强制)\n- 消耗MP=0 (AI填0,引擎按稀有度自动扣除)\n- 冷却回合=0 (强制)\n- 效果公式=' + firstFormula + ' (强制)\n- 目标类型=single_enemy (强制)\n- 基础威力>0\n- 不可附加异常状态\n- ' + (isPhysical ? '物理技能,使用ATK计算,元素属性=无' : '元素技能,使用SpA计算,元素属性=角色元素') + '\n- 稀有度上限=史诗(强制)';
+      } else if (isPassive) {
+        slotLine += '【被动/天赋/光环】\n- 类型=被动 或 天赋 或 光环\n- 消耗MP=0 (强制)\n- 冷却回合=0 (强制)\n- 基础威力=0 (强制)\n- 效果公式=buff 或 debuff\n- 目标类型=self 或 ally 或 all_allies\n- 元素属性=无\n- 数值参数中使用持续回合/攻击加成/防御加成等buff参数\n- 引擎限制:被动仅有3种触发时机(on_attack/on_hit/on_low_hp),on_low_hp仅识别防御加成';
+      } else {
+        slotLine += '【开放位】\n- 类型=主动 (强制)\n- 消耗MP=0 (AI填0,引擎按稀有度自动扣除)\n- 效果公式: physical_damage | magic_damage | heal | buff | debuff | drain_physical | drain_magic | shield_damage\n- 目标类型: single_enemy | self | ally | all_enemies | all_allies\n- 元素属性推荐=' + element + ', 可变更\n- 元素分配建议: ' + combatType + '主属性约60%同元素+25%无属性+15%随机, 辅助技能(heal/buff)约70%无属性+30%同元素';
+      }
+
+      var typeEnum = slotIndex === 1 ? '"主动"' : (isPassive ? '"被动","天赋","光环"' : '"主动"');
+      var formulaEnum;
+      if (slotIndex === 1) {
+        formulaEnum = '"' + firstFormula + '" (固定)';
+      } else if (isPassive) {
+        formulaEnum = '"buff","debuff"';
+      } else {
+        formulaEnum = '"physical_damage","magic_damage","heal","buff","debuff","drain_physical","drain_magic","shield_damage"';
+      }
+      var targetEnum = slotIndex === 1 ? '"single_enemy" (固定)' : '"single_enemy","self","ally","all_enemies","all_allies"';
+
+      var rarityTable =
+        '\n\n## 稀有度数值范围(必须遵守)\n' +
+        '| 稀有度 | 系数范围 | 威力范围 | MP(引擎扣) | 冷却 |\n' +
+        '|--------|---------|---------|-----------|-----|\n' +
+        '| 普通 | 0.5~0.7 | 30~50 | 5 | 0 |\n' +
+        '| 稀有 | 0.7~0.9 | 50~80 | 12 | 0~1 |\n' +
+        '| 史诗 | 0.9~1.1 | 80~120 | 20 | 0~1 |\n' +
+        '| 传说 | 1.1~1.3 | 120~160 | 32 | 2~3 |\n' +
+        '| 神话 | 1.3~1.6 | 160~200+ | 45 | 3~4 |\n' +
+        '- 攻击技能的系数和基础威力必须在上表范围内\n' +
+        '- 治疗/buff/debuff/被动类: 基础威力可为0, 系数不适用\n' +
+        '- 第一技能冷却必为0, 稀有度上限=史诗';
+
+      return '你是一个游戏技能生成器。必须严格遵循以下约束生成JSON格式的技能数据,不要输出其他文字。\n\n## 角色信息\n- 名称: ' + name + '\n- 元素属性: ' + element + '\n- 战斗类型: ' + combatType + '\n- 品质: ' + quality + '\n- 等级: ' + (charData.等级 || 1) + '\n- 攻击力: ' + atk + '\n- 特攻: ' + spa + '\n\n' + slotLine + rarityTable + '\n\n## 字段约束(必须遵守)\n\n1. name: 字符串,技能名称2~4个汉字\n\n2. 类型: 枚举值,只能取以下之一 → [' + typeEnum + ']\n\n3. 稀有度: 枚举值,只能取以下之一 → ["N","普通","稀有","史诗","传说","神话"]\n   上限: ' + slotMaxRarity + '\n\n4. 元素属性: 枚举值,只能取以下之一 → ["地","火","水","风","光","暗","无"]\n\n5. 消耗MP: 统一填0,引擎按稀有度自动扣除\n\n6. 冷却回合: 非负整数(0,1,2,3...)\n   被动/天赋/光环技能: 冷却回合必须=0\n\n7. 基础威力: 非负整数,伤害类技能必须>0,治疗/buff/debuff/被动类可为0\n\n8. 描述: 字符串,简短描述技能效果\n   攻击技能描述建议注明计算公式,如"(ATK×系数)+基础威力"\n\n9. 效果公式: 枚举值,只能取以下之一 → [' + formulaEnum + ']\n\n10. 目标类型: 枚举值,只能取以下之一 → [' + targetEnum + ']\n\n11. 数值参数: 对象,键只能从以下列表中选取:\n    ' + window.SKILL_PARAM_KEYS.join(', ') + '\n    值类型: 数字(整数或小数)\n    攻击技能必须包含系数字段\n    概率字段必须是0~1小数,命中率建议0.85~0.98,回合字段必须为正整数\n\n## 禁止项\n- 禁止创造"同时治疗和伤害"的技能(吸血请用drain_physical/drain_magic)\n- 禁止使用不在约束中的效果公式\n- 禁止使用不在列表中的数值参数键\n- 禁止缺少任何必填字段\n- 禁止技能包含复活/反弹/自爆/驱散/真实伤害/必定暴击/固定伤害值/一击必杀/斩杀线/偷取MP/禁止换人等引擎不支持的效果\n- 禁止自创元素属性或克制关系\n- 禁止被动技能造成伤害\n- 禁止条件自动选择目标(如"血量最低的敌人")\n- 禁止在描述中使用模糊词(如"大幅提升")\n- 禁止物理技能用SpA/元素技能用ATK\n\n## 输出格式\n只返回以下JSON,不要包含其他文字或markdown包裹:\n{\n  "name": "技能名",\n  "类型": "' + (isPassive ? '被动' : (slotIndex === 1 ? '主动' : '主动')) + '",\n  "稀有度": "' + slotMaxRarity + '",\n  "元素属性": "' + (slotIndex === 1 ? firstElement : (isPassive ? '无' : element)) + '",\n  "消耗MP": 0,\n  "冷却回合": ' + (slotIndex === 1 ? 0 : (isPassive ? 0 : 1)) + ',\n  "基础威力": ' + (isPassive ? 0 : 60) + ',\n  "描述": "技能效果描述",\n  "效果公式": "' + (isPassive ? 'buff' : firstFormula) + '",\n  "目标类型": "' + (isPassive ? 'self' : (slotIndex === 1 ? 'single_enemy' : 'single_enemy')) + '",\n  "数值参数": {\n    "系数": 0.8\n  }\n}';
+    }
+
+    function extractJSON(text) {
+      text = text.trim();
+      var match = text.match(/```(?:json)?\s*(\[[\s\S]*?\]|\{[\s\S]*?\})\s*```/);
+      if (match) {
+        var parsed = JSON.parse(match[1]);
+        return Array.isArray(parsed) ? parsed[0] : parsed;
+      }
+      match = text.match(/\[(\{[\s\S]*\})\]/);
+      if (match) return JSON.parse(match[1]);
+      match = text.match(/\{[\s\S]*"name"[\s\S]*"稀有度"[\s\S]*\}/);
+      if (match) return JSON.parse(match[0]);
+      try { return JSON.parse(text); } catch(_) {}
+      try { return JSON.parse(text.replace(/^\[/, '').replace(/\]$/, '')); } catch(_) {}
+      throw new Error('无法解析JSON: ' + text.slice(0, 100));
+    }
+
+    function validateSkill(skill, slotIndex, charData, maxRarity) {
+      if (!skill || typeof skill !== 'object') skill = {};
+      if (!skill.name || typeof skill.name !== 'string') skill.name = '技能' + slotIndex;
+      if (!['主动', '被动', '天赋', '光环'].includes(skill.类型)) skill.类型 = '主动';
+      var isPassiveType = (skill.类型 === '被动' || skill.类型 === '天赋' || skill.类型 === '光环');
+      var isSlot1 = slotIndex === 1;
+      if (isSlot1) {
+        var isPhysical = (charData.攻击力 || 0) >= (charData.特攻 || 0);
+        skill.类型 = '主动';
+        skill.冷却回合 = 0;
+        skill.目标类型 = 'single_enemy';
+        var slot1Formula = isPhysical ? 'physical_damage' : 'magic_damage';
+        var slot1Element = isPhysical ? '无' : (charData.属性 || '无');
+        skill.效果公式 = slot1Formula;
+        skill.元素属性 = slot1Element;
+        if (typeof skill.基础威力 !== 'number' || skill.基础威力 <= 0) skill.基础威力 = 30;
+        var epicIdx = window.SKILL_RARITY_ORDER.indexOf('史诗');
+        var rIdx = window.SKILL_RARITY_ORDER.indexOf(skill.稀有度);
+        if (rIdx === -1 || rIdx > epicIdx) skill.稀有度 = '普通';
+      } else {
+        var maxIdx = window.SKILL_RARITY_ORDER.indexOf(maxRarity);
+        var rIdx = window.SKILL_RARITY_ORDER.indexOf(skill.稀有度);
+        if (rIdx === -1 || rIdx > maxIdx) skill.稀有度 = maxRarity;
+        if (!['地','火','水','风','光','暗','无'].includes(skill.元素属性)) skill.元素属性 = charData.属性 || '无';
+        if (typeof skill.冷却回合 !== 'number' || skill.冷却回合 < 0) skill.冷却回合 = 0;
+        if (isPassiveType) { skill.消耗MP = 0; skill.冷却回合 = 0; skill.基础威力 = 0; }
+        var validFormulas = ['physical_damage','magic_damage','heal','buff','debuff','drain_physical','drain_magic','shield_damage'];
+        if (!validFormulas.includes(skill.效果公式)) skill.效果公式 = isPassiveType ? 'buff' : 'physical_damage';
+        var validTargets = ['single_enemy','self','ally','all_enemies','all_allies'];
+        if (!skill.目标类型 || !validTargets.includes(skill.目标类型)) skill.目标类型 = isPassiveType ? 'self' : 'single_enemy';
+      }
+      if (typeof skill.消耗MP !== 'number' || skill.消耗MP < 0) skill.消耗MP = 0;
+      if (typeof skill.基础威力 !== 'number' || skill.基础威力 < 0) skill.基础威力 = 0;
+      if (!skill.描述 || typeof skill.描述 !== 'string') skill.描述 = '';
+      if (!skill.数值参数 || typeof skill.数值参数 !== 'object') skill.数值参数 = {};
+      Object.keys(skill.数值参数).forEach(function(k) {
+        if (window.SKILL_PARAM_KEYS.indexOf(k) === -1) delete skill.数值参数[k];
+      });
+      return skill;
+    }
+
+    async function generateSingleSkill(charName, charData, slotIndex, slotCount, isPassive) {
+      var maxRarity = getMaxRarity(charData.品质 || 'E');
+      var prompt = buildSlotPrompt(charData, slotIndex, maxRarity, isPassive);
+      try {
+        var result = await generateRaw({
+          ordered_prompts: [{ role: 'system', content: prompt }],
+          should_silence: true,
+          temperature: 0.8
+        });
+        var text = typeof result === 'string' ? result : (result.content || '');
+        var skill = extractJSON(text);
+        validateSkill(skill, slotIndex, charData, maxRarity);
+        if (isPassive) {
+          skill.类型 = '被动';
+          skill.消耗MP = 0;
+          skill.冷却回合 = 0;
+          skill.基础威力 = 0;
+        }
+        return skill;
+      } catch (e) {
+        console.error('槽位' + slotIndex + '生成失败:', e);
+        try {
+          var result2 = await generateRaw({
+            ordered_prompts: [{ role: 'system', content: prompt + '\n\n注意: 只返回JSON,不要用```包裹,不要包含其他文字。' }],
+            should_silence: true,
+            temperature: 0.7
+          });
+          var text2 = typeof result2 === 'string' ? result2 : (result2.content || '');
+          var skill2 = extractJSON(text2);
+          validateSkill(skill2, slotIndex, charData, maxRarity);
+          return skill2;
+        } catch (e2) {
+          console.error('槽位' + slotIndex + '重试失败:', e2);
+          return null;
+        }
+      }
+    }
+
+    async function generateAllSkills(charName) {
+      if (!currentData || !currentData.角色数据 || !currentData.角色数据[charName]) {
+        notify('未找到角色数据', 'error');
+        return;
+      }
+      var charData = currentData.角色数据[charName];
+      var quality = charData.品质 || 'E';
+      var slotCount = getSkillSlotCount();
+      notify('正在为 ' + charName + ' 生成技能 (共' + slotCount + '槽位)...', 'info');
+      var skills = {};
+      var successCount = 0;
+      for (var i = 1; i <= slotCount; i++) {
+        var label = window.SLOT_LABELS[i];
+        var isPassive = rollPassive(i);
+        notify('生成技能中 (' + i + '/' + slotCount + '): ' + (label ? label.name : '槽位' + i) + (isPassive ? ' [被动]' : ''), 'info');
+        var skill = await generateSingleSkill(charName, charData, i, slotCount, isPassive);
+        if (skill) {
+          skills['槽位_' + i] = skill;
+          successCount++;
+        } else {
+          skills['槽位_' + i] = {
+            name: '未生成', 类型: '主动', 稀有度: 'N', 元素属性: charData.属性 || '无',
+            消耗MP: 0, 冷却回合: 0, 基础威力: 0, 描述: '生成失败，请重试',
+            效果公式: 'physical_damage', 目标类型: 'single_enemy', 数值参数: {}
+          };
+        }
+      }
+      try {
+        await updateVariablesWith(function(variables) {
+          _.set(variables, 'stat_data.角色数据.' + charName + '.技能', skills);
+          return variables;
+        }, { type: 'message' });
+        populateCharacterData();
+        notify(charName + ' 技能生成完成！成功' + successCount + '/' + slotCount, successCount === slotCount ? 'success' : 'warning');
+      } catch(e) {
+        console.error('技能数据写入失败:', e);
+        notify('技能数据写入失败', 'error');
+      }
+    }
+
+    async function refreshSingleSkill(charName, slotKey) {
+      if (!currentData || !currentData.角色数据 || !currentData.角色数据[charName]) {
+        notify('未找到角色数据', 'error');
+        return;
+      }
+      var charData = currentData.角色数据[charName];
+      var slotIndex = parseInt(slotKey.replace('槽位_', ''), 10);
+      var label = window.SLOT_LABELS[slotIndex];
+      var displayName = label ? label.name : slotKey;
+      var promptSlotIndex = !isNaN(slotIndex) ? slotIndex : 3;
+      var isPassive = rollPassive(promptSlotIndex);
+      notify('重铸 ' + displayName + (isPassive ? ' [被动]' : '') + '...', 'info');
+      var skill = await generateSingleSkill(charName, charData, promptSlotIndex, getSkillSlotCount(), isPassive);
+      if (skill) {
+        try {
+          await updateVariablesWith(function(variables) {
+            _.set(variables, 'stat_data.角色数据.' + charName + '.技能.' + slotKey, skill);
+            return variables;
+          }, { type: 'message' });
+          populateCharacterData();
+          notify((label ? label.name : slotKey) + ' 已重铸', 'success');
+        } catch(e) {
+          console.error('技能更新写入失败:', e);
+          notify('技能更新写入失败', 'error');
+        }
+      } else {
+        notify('重铸失败，请重试', 'error');
+      }
+    }
+
     async function init() {
       if (window._mobileStatusInitialized) return;
       window._mobileStatusInitialized = true;
@@ -2631,6 +3244,7 @@ function renderCharsList($scroll) {
         await waitGlobalInitialized('Mvu');
         populateCharacterData();
         loadWarehouseData();
+        loadSenkiWarehouseData();
 
         eventOn(Mvu.events.VARIABLE_UPDATE_ENDED, () => {
           populateCharacterData();
@@ -2676,6 +3290,10 @@ function renderCharsList($scroll) {
           showWarehouse();
         });
 
+        $(document).on('click', '#btn-senki-warehouse', function() {
+          showSenkiWarehouse();
+        });
+
         $(document).on('click', '.destroy-bag-btn', function(e) {
           e.stopPropagation();
           var name = $(this).data('destroy-name');
@@ -2686,7 +3304,10 @@ function renderCharsList($scroll) {
         $(document).on('click', '.list-item, .collection-slot', function() {
           const name = $(this).data('name');
           const type = $(this).data('type');
-          if (type === 'char') {
+          var isColSlot = $(this).hasClass('collection-slot');
+          if (isColSlot) {
+            showSenkiWarehouse();
+          } else if (type === 'char') {
             showCharDetail(name);
           } else if (type === 'bag') {
             showItemDetail(name, type);
@@ -2705,6 +3326,19 @@ function renderCharsList($scroll) {
           e.stopPropagation();
           var questId = $(this).data('quest-id');
           showClaimModal(questId);
+        });
+
+        $(document).on('click', '#btn-store-senki', async function() {
+          var $btn = $(this);
+          $btn.prop('disabled', true).text('⏳');
+          try {
+            await depositSenki(selectedCharName);
+            goBack();
+          } catch(e) {
+            console.error(e);
+          } finally {
+            if ($btn.length) { $btn.prop('disabled', false).text('📦 存入仓库'); }
+          }
         });
 
         $('#btn-back').on('click', goBack);
@@ -2748,6 +3382,20 @@ function renderCharsList($scroll) {
           $(this).text($('#app').hasClass('collapsed') ? '▲' : '▼');
         });
 
+        $(document).on('click', '.btn-gen-skills', async function() {
+          var charName = $(this).data('char-name');
+          $(this).prop('disabled', true).text('⏳ 生成中...');
+          await generateAllSkills(charName);
+          renderCurrentTab();
+        });
+        $(document).on('click', '.btn-refresh-skill', async function() {
+          var $btn = $(this);
+          var charName = $btn.data('char-name');
+          var slotKey = $btn.data('slot-key');
+          $btn.prop('disabled', true).text('⏳');
+          await refreshSingleSkill(charName, slotKey);
+          renderCurrentTab();
+        });
         $(document).on('click', '.section-head', function() {
           const section = $(this).data('section');
           toggleSection(section);
@@ -2808,6 +3456,10 @@ function renderCharsList($scroll) {
       </div>
 
       <div class="list-panel" id="panel-warehouse">
+        <div class="list-scroll"></div>
+      </div>
+
+      <div class="list-panel" id="panel-senki-warehouse">
         <div class="list-scroll"></div>
       </div>
 
@@ -2885,6 +3537,7 @@ function renderCharsList($scroll) {
           </div>
           <div class="char-name" id="detail-name">NAME</div>
           <div id="detail-owner"></div>
+          <div id="detail-actions" style="margin-top:4px;"></div>
         </div>
         <div class="detail-scroll" id="detail-scroll"></div>
       </div>

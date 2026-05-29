@@ -120,13 +120,19 @@
             己方战姬受到反噬伤害
           </div>
 
+          <div v-if="enemyEscaped && !displayResult.success" class="escape-notice">
+            {{ enemyName }} 趁乱逃跑了。你仍可消耗捕捉球继续尝试。
+          </div>
+
           <div class="result-detail">{{ displayResult.detailText }}</div>
 
           <div class="result-actions">
             <button v-if="!displayResult.success && hasBallsLeft" class="retry-btn" @click="onRetry">
               重新捕捉
             </button>
-            <button v-if="!displayResult.success" class="capture-skip-btn" @click="$emit('skip')">放弃捕捉</button>
+            <button v-if="!displayResult.success" class="capture-skip-btn" @click="$emit('skip')">
+              {{ enemyEscaped ? '确定' : '放弃捕捉' }}
+            </button>
             <button v-if="displayResult.success" class="confirm-capture-btn" @click="$emit('confirm')">确认</button>
           </div>
         </template>
@@ -148,6 +154,7 @@ const props = defineProps<{
   preview: CaptureRollResult | null;
   rolledResult: CaptureRollResult | null;
   lastBallUsed: string | null;
+  enemyEscaped?: boolean;
 }>();
 
 const emit = defineEmits<{
