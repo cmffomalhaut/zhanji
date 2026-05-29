@@ -3246,7 +3246,7 @@ function renderCharsList($scroll) {
           var label = window.SLOT_LABELS && window.SLOT_LABELS[slotNum];
           var typeTag = getSkillTypeTag(skill.类型);
           var rarityTag = getRarityTag(skill.稀有度);
-          var mp = skill.消耗MP || 0;
+          var skillMp = skill.消耗MP || 0;
           var cd = skill.冷却回合 || 0;
           var power = skill.基础威力 || 0;
           var displayName = skill.name || skillKey;
@@ -3259,7 +3259,7 @@ function renderCharsList($scroll) {
                   ${typeTag} ${rarityTag} ${displayName}
                 </div>
                 <div class="skill-meta">
-                  ${mp > 0 ? `<span class="skill-mp">💧${mp}</span>` : ''}
+                  ${skillMp > 0 ? `<span class="skill-mp">💧${skillMp}</span>` : ''}
                   ${cd > 0 ? `<span class="skill-cd">⏱️CD:${cd}</span>` : ''}
                   ${power > 0 ? `<span style="font-size:10px;color:#f59e0b;font-weight:bold;">💥${power}</span>` : ''}
                   <button class="btn-refresh-skill" data-char-name="${name}" data-slot-key="${skillKey}" title="重铸此技能" style="margin-left:4px;${!isLatest ? 'opacity:0.5;pointer-events:none;' : ''}" ${!isLatest ? 'disabled' : ''}>🔄</button>
