@@ -2365,6 +2365,7 @@ function renderCharsList($scroll) {
         }
         await updateVariablesWith(function(variables) {
           var oldSkills = _.get(variables, 'stat_data.角色数据.' + charName + '.技能', {});
+          skillBackupCache[charName] = oldSkills;
           var cleaned = {};
           Object.keys(oldSkills).forEach(function(k) {
             if (/^槽位_\d+$/.test(k)) { cleaned[k] = oldSkills[k]; }
@@ -2809,6 +2810,7 @@ function renderCharsList($scroll) {
       renderList(currentTab);
     }
 
+    var skillBackupCache = {};
     var archiveState = { charName: null, messageCount: 8 };
     var archiveCache = {};
 
@@ -3073,6 +3075,24 @@ function renderCharsList($scroll) {
         $('#btn-retry-archive').off('click').on('click', function() {
           promptBondArchiveGeneration(charName);
         });
+      }
+    }
+
+    async function restoreSkillsBackup(charName) {
+      var backup = skillBackupCache[charName];
+      if (!backup) { notify('没有可恢复的技能备份', 'warning'); return; }
+      try {
+        await updateVariablesWith(function(variables) {
+          _.set(variables, 'stat_data.角色数据.' + charName + '.技能', backup);
+          return variables;
+        }, { type: 'message' });
+        delete skillBackupCache[charName];
+        populateCharacterData();
+        renderCurrentTab();
+        notify(charName + ' 技能已恢复到上次状态', 'success');
+      } catch(e) {
+        console.error('技能恢复失败:', e);
+        notify('恢复失败', 'error');
       }
     }
 
@@ -3418,6 +3438,13 @@ function renderCharsList($scroll) {
         '<button class="archive-btn" id="btn-bond-archive" data-char-name="' + name + '" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;">' + archiveBtnText + '</button>' +
         '</div>';
 
+      var hasBackup = !!skillBackupCache[name];
+      if (hasBackup) {
+        html += '<div style="padding:4px 0;text-align:center;">' +
+          '<button class="archive-btn" id="btn-restore-skills" data-char-name="' + name + '" style="background:#ef4444;color:#fff;font-size:12px;padding:4px 12px;">↩ 恢复上次技能</button>' +
+          '</div>';
+      }
+
       $scroll.html(html);
 
       Object.keys(collapsedSections).forEach(sectionId => {
@@ -3720,6 +3747,7 @@ function renderCharsList($scroll) {
       }
       try {
         await updateVariablesWith(function(variables) {
+          skillBackupCache[charName] = _.get(variables, 'stat_data.角色数据.' + charName + '.技能', {});
           _.set(variables, 'stat_data.角色数据.' + charName + '.技能', skills);
           return variables;
         }, { type: 'message' });
@@ -3748,6 +3776,7 @@ function renderCharsList($scroll) {
         try {
           await updateVariablesWith(function(variables) {
             var oldSkills = _.get(variables, 'stat_data.角色数据.' + charName + '.技能', {});
+            skillBackupCache[charName] = oldSkills;
             var cleaned = {};
             Object.keys(oldSkills).forEach(function(k) {
               if (/^槽位_\d+$/.test(k)) { cleaned[k] = oldSkills[k]; }
@@ -3921,6 +3950,11 @@ function renderCharsList($scroll) {
         $(document).on('click', '#btn-bond-archive', function() {
           var charName = $(this).data('char-name');
           showBondArchive(charName);
+        });
+        $(document).on('click', '#btn-restore-skills', async function() {
+          var charName = $(this).data('char-name');
+          $(this).prop('disabled', true).text('⏳ 恢复中...');
+          await restoreSkillsBackup(charName);
         });
         $(document).on('click', '.btn-gen-skills', async function() {
           var charName = $(this).data('char-name');
