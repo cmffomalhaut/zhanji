@@ -3572,10 +3572,25 @@ function renderCharsList($scroll) {
     };
 
     function getSlotRarityLimit(quality, slotIndex) {
-      var t = slotIndex === 1
-        ? { E:'普通', D:'普通', C:'稀有', B:'稀有', A:'史诗', S:'传说' }
-        : { E:'普通', D:'普通', C:'稀有', B:'史诗', A:'传说', S:'神话' };
-      return t[quality] || '普通';
+      if (slotIndex === 1) {
+        return { E:'普通', D:'普通', C:'稀有', B:'稀有', A:'史诗', S:'传说' }[quality] || '史诗';
+      }
+      return '神话';
+    }
+
+    function getInitialSlotRarity(quality, slotIndex) {
+      var map = {
+        'E': [['普通']],
+        'D': [['普通'], ['普通']],
+        'C': [['普通','稀有'], ['普通','稀有']],
+        'B': [['稀有'], ['稀有','史诗'], ['稀有','史诗']],
+        'A': [['史诗'], ['传说'], ['稀有','史诗']],
+        'S': [['传说'], ['神话'], ['史诗','传说'], ['史诗','传说']]
+      };
+      var slots = map[quality];
+      if (!slots || slotIndex > slots.length) return null;
+      var options = slots[slotIndex - 1];
+      return options[Math.floor(Math.random() * options.length)];
     }
 
     function getSkillSlotCount() {
@@ -3641,7 +3656,7 @@ function renderCharsList($scroll) {
         '- 治疗/buff/debuff/被动类: 基础威力可为0, 系数不适用\n' +
         '- 第一技能冷却必为0, 稀有度上限=' + getSlotRarityLimit(quality, 1);
 
-      return '你是一个游戏技能生成器。必须严格遵循以下约束生成JSON格式的技能数据,不要输出其他文字。\n\n## 角色信息\n- 名称: ' + name + '\n- 元素属性: ' + element + '\n- 战斗类型: ' + combatType + '\n- 品质: ' + quality + '\n- 等级: ' + (charData.等级 || 1) + '\n- 攻击力: ' + atk + '\n- 特攻: ' + spa + '\n\n' + slotLine + rarityTable + '\n\n## 字段约束(必须遵守)\n\n1. name: 字符串,技能名称2~4个汉字\n\n2. 类型: 枚举值,只能取以下之一 → [' + typeEnum + ']\n\n3. 稀有度: 枚举值,只能取以下之一 → ["N","普通","稀有","史诗","传说","神话"]\n   ' + (fixedRarity ? '锁定为: ' + fixedRarity + ' (学习机固定,不可变更)' : '上限: ' + slotMaxRarity) + '\n\n4. 元素属性: 枚举值,只能取以下之一 → ["地","火","水","风","光","暗","无"]\n\n5. 消耗MP: 统一填0,引擎按稀有度自动扣除\n\n6. 冷却回合: 非负整数(0,1,2,3...)\n   被动/天赋/光环技能: 冷却回合必须=0\n\n7. 基础威力: 非负整数,伤害类技能必须>0,治疗/buff/debuff/被动类可为0\n\n8. 描述: 字符串,简短描述技能效果\n   攻击技能描述建议注明计算公式,如"(ATK×系数)+基础威力"\n\n9. 效果公式: 枚举值,只能取以下之一 → [' + formulaEnum + ']\n\n10. 目标类型: 枚举值,只能取以下之一 → [' + targetEnum + ']\n\n11. 数值参数: 对象,键只能从以下列表中选取:\n    ' + window.SKILL_PARAM_KEYS.join(', ') + '\n    值类型: 数字(整数或小数)\n    攻击技能必须包含系数字段\n    概率字段必须是0~1小数,命中率建议0.85~0.98,回合字段必须为正整数\n\n## 禁止项\n- 禁止创造"同时治疗和伤害"的技能(吸血请用drain_physical/drain_magic)\n- 禁止使用不在约束中的效果公式\n- 禁止使用不在列表中的数值参数键\n- 禁止缺少任何必填字段\n- 禁止技能包含复活/反弹/自爆/驱散/真实伤害/必定暴击/固定伤害值/一击必杀/斩杀线/偷取MP/禁止换人等引擎不支持的效果\n- 禁止自创元素属性或克制关系\n- 禁止被动技能造成伤害\n- 禁止条件自动选择目标(如"血量最低的敌人")\n- 禁止在描述中使用模糊词(如"大幅提升")\n- 禁止物理技能用SpA/元素技能用ATK\n\n## 输出格式\n只返回以下JSON,不要包含其他文字或markdown包裹:\n{\n  "name": "技能名",\n  "类型": "' + (isPassive ? '被动' : (slotIndex === 1 ? '主动' : '主动')) + '",\n  "稀有度": "' + (fixedRarity || slotMaxRarity) + '",\n  "元素属性": "' + (slotIndex === 1 ? firstElement : (isPassive ? '无' : element)) + '",\n  "消耗MP": 0,\n  "冷却回合": ' + (slotIndex === 1 ? 0 : (isPassive ? 0 : 1)) + ',\n  "基础威力": ' + (isPassive ? 0 : 60) + ',\n  "描述": "技能效果描述",\n  "效果公式": "' + (isPassive ? 'buff' : firstFormula) + '",\n  "目标类型": "' + (isPassive ? 'self' : (slotIndex === 1 ? 'single_enemy' : 'single_enemy')) + '",\n  "数值参数": {\n    "系数": 0.8\n  }\n}';
+      return '你是一个游戏技能生成器。必须严格遵循以下约束生成JSON格式的技能数据,不要输出其他文字。\n\n## 角色信息\n- 名称: ' + name + '\n- 元素属性: ' + element + '\n- 战斗类型: ' + combatType + '\n- 品质: ' + quality + '\n- 等级: ' + (charData.等级 || 1) + '\n- 攻击力: ' + atk + '\n- 特攻: ' + spa + '\n\n' + slotLine + rarityTable + '\n\n## 字段约束(必须遵守)\n\n1. name: 字符串,技能名称2~4个汉字\n\n2. 类型: 枚举值,只能取以下之一 → [' + typeEnum + ']\n\n3. 稀有度: 枚举值,只能取以下之一 → ["N","普通","稀有","史诗","传说","神话"]\n   ' + (fixedRarity ? '锁定为: ' + fixedRarity + ' (不可变更)' : '上限: ' + slotMaxRarity) + '\n\n4. 元素属性: 枚举值,只能取以下之一 → ["地","火","水","风","光","暗","无"]\n\n5. 消耗MP: 统一填0,引擎按稀有度自动扣除\n\n6. 冷却回合: 非负整数(0,1,2,3...)\n   被动/天赋/光环技能: 冷却回合必须=0\n\n7. 基础威力: 非负整数,伤害类技能必须>0,治疗/buff/debuff/被动类可为0\n\n8. 描述: 字符串,简短描述技能效果\n   攻击技能描述建议注明计算公式,如"(ATK×系数)+基础威力"\n\n9. 效果公式: 枚举值,只能取以下之一 → [' + formulaEnum + ']\n\n10. 目标类型: 枚举值,只能取以下之一 → [' + targetEnum + ']\n\n11. 数值参数: 对象,键只能从以下列表中选取:\n    ' + window.SKILL_PARAM_KEYS.join(', ') + '\n    值类型: 数字(整数或小数)\n    攻击技能必须包含系数字段\n    概率字段必须是0~1小数,命中率建议0.85~0.98,回合字段必须为正整数\n\n## 禁止项\n- 禁止创造"同时治疗和伤害"的技能(吸血请用drain_physical/drain_magic)\n- 禁止使用不在约束中的效果公式\n- 禁止使用不在列表中的数值参数键\n- 禁止缺少任何必填字段\n- 禁止技能包含复活/反弹/自爆/驱散/真实伤害/必定暴击/固定伤害值/一击必杀/斩杀线/偷取MP/禁止换人等引擎不支持的效果\n- 禁止自创元素属性或克制关系\n- 禁止被动技能造成伤害\n- 禁止条件自动选择目标(如"血量最低的敌人")\n- 禁止在描述中使用模糊词(如"大幅提升")\n- 禁止物理技能用SpA/元素技能用ATK\n\n## 输出格式\n只返回以下JSON,不要包含其他文字或markdown包裹:\n{\n  "name": "技能名",\n  "类型": "' + (isPassive ? '被动' : (slotIndex === 1 ? '主动' : '主动')) + '",\n  "稀有度": "' + (fixedRarity || slotMaxRarity) + '",\n  "元素属性": "' + (slotIndex === 1 ? firstElement : (isPassive ? '无' : element)) + '",\n  "消耗MP": 0,\n  "冷却回合": ' + (slotIndex === 1 ? 0 : (isPassive ? 0 : 1)) + ',\n  "基础威力": ' + (isPassive ? 0 : 60) + ',\n  "描述": "技能效果描述",\n  "效果公式": "' + (isPassive ? 'buff' : firstFormula) + '",\n  "目标类型": "' + (isPassive ? 'self' : (slotIndex === 1 ? 'single_enemy' : 'single_enemy')) + '",\n  "数值参数": {\n    "系数": 0.8\n  }\n}';
     }
 
     function extractJSON(text) {
@@ -3755,7 +3770,8 @@ function renderCharsList($scroll) {
         var label = window.SLOT_LABELS[i];
         var isPassive = rollPassive(i);
         notify('生成技能中 (' + i + '/' + slotCount + '): ' + (label ? label.name : '槽位' + i) + (isPassive ? ' [被动]' : ''), 'info');
-        var skill = await generateSingleSkill(charName, charData, i, slotCount, isPassive);
+        var initRarity = getInitialSlotRarity(quality, i);
+        var skill = await generateSingleSkill(charName, charData, i, slotCount, isPassive, initRarity);
         if (skill) {
           skills['槽位_' + i] = skill;
           successCount++;
