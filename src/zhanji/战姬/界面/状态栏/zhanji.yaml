@@ -2798,7 +2798,8 @@ function renderCharsList($scroll) {
       archiveState.charName = charName;
       currentView = 'archive';
 
-      var archive = data.羁绊档案;
+      var archive = null;
+      try { archive = localStorage.getItem('zhanji_bond_archive_' + charName); } catch(e) {}
       if (archive) {
         renderBondArchive(charName, archive);
       } else {
@@ -3038,13 +3039,8 @@ function renderCharsList($scroll) {
         var text = typeof result === 'string' ? result : (result.content || '');
         if (!text) throw new Error('生成结果为空');
 
-        await updateVariablesWith(function(variables) {
-          _.set(variables, 'stat_data.角色数据.' + charName + '.羁绊档案', text);
-          return variables;
-        }, { type: 'message' });
+        try { localStorage.setItem('zhanji_bond_archive_' + charName, text); } catch(e) { console.error('存档保存失败:', e); notify('存档保存失败', 'warning'); return; }
 
-        populateCharacterData();
-        var updatedData = _.get(currentData, '角色数据.' + charName, {});
         notify(charName + ' 羁绊档案已生成', 'success');
         renderBondArchive(charName, text);
 
@@ -3376,7 +3372,8 @@ function renderCharsList($scroll) {
         </div>
       `;
 
-      var hasArchive = !!data.羁绊档案;
+      var hasArchive = false;
+      try { hasArchive = !!localStorage.getItem('zhanji_bond_archive_' + name); } catch(e) {}
       var archiveBtnText = hasArchive ? '📖 查看羁绊档案' : '📖 生成羁绊档案';
       html += '<div style="padding:8px 0;text-align:center;">' +
         '<button class="archive-btn" id="btn-bond-archive" data-char-name="' + name + '" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;">' + archiveBtnText + '</button>' +
@@ -3880,6 +3877,7 @@ function renderCharsList($scroll) {
           var charName = $(this).data('char-name');
           showBondArchive(charName);
         });
+        $(document).on('click', '.btn-gen-skills', async function() {
           var charName = $(this).data('char-name');
           $(this).prop('disabled', true).text('⏳ 生成中...');
           await generateAllSkills(charName);
