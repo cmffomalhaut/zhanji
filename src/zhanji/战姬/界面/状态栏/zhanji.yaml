@@ -2203,6 +2203,133 @@ function renderCharsList($scroll) {
       renderCurrentTab();
     }
 
+    // === 技能学习机流程 ===
+    var learnState = { itemName: null, rarity: null, step: 0, chars: [], selectedChar: null, selectedSlot: null };
+
+    function showLearnModal(itemName) {
+      var rarity = window.SKILL_LEARN_MACHINE_MAP[itemName];
+      if (!rarity) { notify('未知的学习机', 'error'); return; }
+      var chars = [];
+      _.each(currentData.角色数据, function(c, name) {
+        if (c && c.名称) chars.push(name);
+      });
+      if (chars.length === 0) { notify('没有可使用的战姬', 'warning'); return; }
+      learnState = { itemName: itemName, rarity: rarity, step: 0, chars: chars, selectedChar: null, selectedSlot: null };
+      renderLearnStep(1);
+      $('#learn-modal').addClass('show');
+    }
+
+    function hideLearnModal() {
+      $('#learn-modal').removeClass('show');
+      learnState = { itemName: null, rarity: null, step: 0, chars: [], selectedChar: null, selectedSlot: null };
+    }
+
+    function renderLearnStep(step) {
+      learnState.step = step;
+      var rarityColor = { '普通': '#94a3b8', '稀有': '#22d3ee', '史诗': '#a78bfa', '传说': '#fbbf24' };
+      var rColor = rarityColor[learnState.rarity] || '#94a3b8';
+      $('#learn-modal-title').html('🎓 技能学习机 <span style="color:' + rColor + ';font-size:12px;">[' + learnState.rarity + ']</span>');
+      var $body = $('#learn-modal-body');
+      if (step === 1) {
+        var html = '<div style="margin-bottom:8px;font-size:13px;color:#94a3b8;">选择要学习的战姬:</div>';
+        learnState.chars.forEach(function(name) {
+          var c = currentData.角色数据[name];
+          var quality = c.品质 || 'E';
+          var element = c.属性 || '无';
+          html += '<div class="list-item learn-char-item" data-char="' + name + '" style="cursor:pointer;">' +
+            '<div class="item-left"><div class="item-name">⚔️ ' + name + '</div>' +
+            '<div class="item-sub">品质' + quality + ' | ' + element + '</div></div></div>';
+        });
+        $body.html(html);
+        $('.learn-char-item').off('click').on('click', function() {
+          learnState.selectedChar = $(this).data('char');
+          renderLearnStep(2);
+        });
+      } else if (step === 2) {
+        var charName = learnState.selectedChar;
+        var charName = learnState.selectedChar;
+        var charData = currentData.角色数据[charName];
+        var skills = charData.技能 || {};
+        var html = '<div style="margin-bottom:8px;font-size:13px;color:#94a3b8;">为 <b>' + charName + '</b> 选择要替换的槽位:</div>';
+        for (var i = 2; i <= 6; i++) {
+          var sk = skills['槽位_' + i];
+          var currName = sk ? (sk.name || '未生成') : '空';
+          var currRarity = sk ? (sk.稀有度 || '-') : '-';
+          html += '<div class="list-item learn-slot-item" data-slot="' + i + '" style="cursor:pointer;">' +
+            '<div class="item-left"><div class="item-name">槽位 ' + i + '</div>' +
+            '<div class="item-sub">当前: ' + currName + ' [' + currRarity + ']</div></div>' +
+            '<span style="color:' + rColor + ';font-size:12px;">→ ' + learnState.rarity + '</span></div>';
+        }
+        $body.html(html);
+        $('.learn-slot-item').off('click').on('click', function() {
+          learnState.selectedSlot = $(this).data('slot');
+          renderLearnStep(3);
+        });
+      } else if (step === 3) {
+        var charName = learnState.selectedChar;
+        var slotKey = '槽位_' + learnState.selectedSlot;
+        var oldSkill = _.get(currentData, '角色数据.' + charName + '.技能.' + slotKey, {});
+        var oldName = oldSkill.name || '空';
+        var oldRarity = oldSkill.稀有度 || '-';
+        var html = '<div style="font-size:13px;color:#e2e8f0;margin-bottom:12px;">' +
+          '确认使用 <b style="color:' + rColor + ';">' + learnState.itemName + '</b> 为 <b>' + charName + '</b> 学习技能</div>' +
+          '<div class="info-card"><div class="info-row"><span class="info-label">🎯 目标槽位</span><span class="info-value">槽位 ' + learnState.selectedSlot + '</span></div>' +
+          '<div class="info-row"><span class="info-label">⬅ 旧技能</span><span class="info-value">' + oldName + ' [' + oldRarity + ']</span></div>' +
+          '<div class="info-row"><span class="info-label">➡ 新品质</span><span class="info-value" style="color:' + rColor + ';">' + learnState.rarity + '</span></div></div>';
+        $body.html(html);
+      }
+      var $confirm = $('#learn-modal-confirm');
+      if (step < 3) {
+        $confirm.hide();
+      } else {
+        $confirm.show().text('🎓 确认学习').prop('disabled', false);
+      }
+    }
+
+    async function confirmLearnSkill() {
+      var state = learnState;
+      if (!state.itemName || !state.selectedChar || !state.selectedSlot) return;
+      if (getCurrentMessageId() !== getLastMessageId()) { notify('请在最新楼层操作', 'warning'); hideLearnModal(); return; }
+      var charName = state.selectedChar;
+      var slotIndex = state.selectedSlot;
+      var slotKey = '槽位_' + slotIndex;
+      var charData = currentData.角色数据[charName];
+      if (!charData) { notify('角色数据不存在', 'error'); hideLearnModal(); return; }
+      var $btn = $('#learn-modal-confirm');
+      $btn.prop('disabled', true).text('⏳ 生成中...');
+      try {
+        var isPassive = rollPassive(slotIndex);
+        notify('正在使用 ' + state.itemName + ' 为 ' + charName + ' 生成技能 [槽位' + slotIndex + ']' + (isPassive ? ' [被动]' : ''), 'info');
+        var skill = await generateSingleSkill(charName, charData, slotIndex, getSkillSlotCount(), isPassive, state.rarity);
+        if (!skill) {
+          notify('技能生成失败，未消耗学习机', 'error');
+          $btn.prop('disabled', false).text('🎓 确认学习');
+          return;
+        }
+        await updateVariablesWith(function(variables) {
+          _.set(variables, 'stat_data.角色数据.' + charName + '.技能.' + slotKey, skill);
+          var bp = _.get(variables, 'stat_data.背包.' + state.itemName, {});
+          if (bp.数量) {
+            bp.数量 = (bp.数量 || 1) - 1;
+            if (bp.数量 <= 0) {
+              _.unset(variables, 'stat_data.背包.' + state.itemName);
+            } else {
+              _.set(variables, 'stat_data.背包.' + state.itemName, bp);
+            }
+          }
+          return variables;
+        }, { type: 'message' });
+        populateCharacterData();
+        notify(charName + ' 槽位' + slotIndex + ' 已学习新技能 [' + (skill.name || '未知') + ']', 'success');
+        hideLearnModal();
+        renderCurrentTab();
+      } catch(e) {
+        console.error('学习机使用失败:', e);
+        notify('学习机使用失败', 'error');
+        $btn.prop('disabled', false).text('🎓 确认学习');
+      }
+    }
+
     async function confirmDestroyAction() {
       if (!pendingDestroyAction) return;
       if (getCurrentMessageId() !== getLastMessageId()) { notify('请在最新楼层操作', 'warning'); hideDestroyModal(); return; }
@@ -2794,29 +2921,19 @@ function renderCharsList($scroll) {
           <div class="section-head" data-section="skills"><span>⚡ 技能列表</span><span class="toggle-icon">▼</span></div>
           <div class="section-body" id="body-skills">
       `;
-      const skillEntries = Object.entries(skills);
-      if (skillEntries.length === 0) {
-        html += `
-          <div style="text-align:center;padding:10px;">
-            <div style="color:#64748b;font-size:11px;margin-bottom:8px;">暂无技能</div>
-            <button class="btn-gen-skills" data-char-name="${name}" style="padding:6px 16px;font-size:12px;background:#6366f1;color:#fff;border:none;border-radius:4px;cursor:pointer;${!isLatest ? 'opacity:0.5;' : ''}" ${!isLatest ? 'disabled' : ''}>⚡ 生成技能</button>
-          </div>
-        `;
-      } else {
-        const sortedEntries = [...skillEntries].sort(([a], [b]) => {
-          const na = parseInt(a.replace('槽位_', ''), 10);
-          const nb = parseInt(b.replace('槽位_', ''), 10);
-          return (!isNaN(na) ? na : 999) - (!isNaN(nb) ? nb : 999);
-        });
-        sortedEntries.forEach(([skillKey, skill]) => {
-          const slotNum = parseInt(skillKey.replace('槽位_', ''), 10);
-          const label = window.SLOT_LABELS && window.SLOT_LABELS[slotNum];
-          const typeTag = getSkillTypeTag(skill.类型);
-          const rarityTag = getRarityTag(skill.稀有度);
-          const mp = skill.消耗MP || 0;
-          const cd = skill.冷却回合 || 0;
-          const power = skill.基础威力 || 0;
-          const displayName = skill.name || skillKey;
+      var maxSlots = (typeof getSkillSlotCount === 'function' ? getSkillSlotCount() : 6);
+      var hasAnySkill = Object.keys(skills).length > 0;
+      for (var slotNum = 1; slotNum <= maxSlots; slotNum++) {
+        var skillKey = '槽位_' + slotNum;
+        var skill = skills[skillKey];
+        if (skill) {
+          var label = window.SLOT_LABELS && window.SLOT_LABELS[slotNum];
+          var typeTag = getSkillTypeTag(skill.类型);
+          var rarityTag = getRarityTag(skill.稀有度);
+          var mp = skill.消耗MP || 0;
+          var cd = skill.冷却回合 || 0;
+          var power = skill.基础威力 || 0;
+          var displayName = skill.name || skillKey;
 
           html += `
             <div class="skill-card${skill.稀有度 === '神话' ? ' mythic' : ''}">
@@ -2829,7 +2946,7 @@ function renderCharsList($scroll) {
                   ${mp > 0 ? `<span class="skill-mp">💧${mp}</span>` : ''}
                   ${cd > 0 ? `<span class="skill-cd">⏱️CD:${cd}</span>` : ''}
                   ${power > 0 ? `<span style="font-size:10px;color:#f59e0b;font-weight:bold;">💥${power}</span>` : ''}
-                  <button class="btn-refresh-skill" data-char-name="${name}" data-slot-key="${skillKey}" title="重铸此技能" style="margin-left:4px;${!isLatest ? 'opacity:0.5;pointer-events:none;' : ''}" ${!isLatest ? 'disabled' : ''}>🔄</button>
+                  ${slotNum !== 1 ? `<button class="btn-refresh-skill" data-char-name="${name}" data-slot-key="${skillKey}" title="重铸此技能" style="margin-left:4px;${!isLatest ? 'opacity:0.5;pointer-events:none;' : ''}" ${!isLatest ? 'disabled' : ''}>🔄</button>` : ''}
                 </div>
               </div>
               ${label ? `<div class="slot-type-hint">${label.desc}</div>` : ''}
@@ -2837,7 +2954,29 @@ function renderCharsList($scroll) {
               ${skill.效果公式 ? `<div class="skill-formula">📐 ${skill.效果公式}</div>` : ''}
             </div>
           `;
-        });
+        } else if (hasAnySkill) {
+          html += `
+            <div class="skill-card" style="opacity:0.5;border:1px dashed #475569;">
+              <div class="skill-header">
+                <div class="skill-name">
+                  <span class="slot-badge">槽位 ${slotNum}</span>
+                  <span style="color:#64748b;font-size:11px;">空</span>
+                </div>
+                <div class="skill-meta">
+                  <span style="color:#475569;font-size:10px;">可使用学习机</span>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+      }
+      if (!hasAnySkill) {
+        html += `
+          <div style="text-align:center;padding:10px;">
+            <div style="color:#64748b;font-size:11px;margin-bottom:8px;">暂无技能</div>
+            <button class="btn-gen-skills" data-char-name="${name}" style="padding:6px 16px;font-size:12px;background:#6366f1;color:#fff;border:none;border-radius:4px;cursor:pointer;${!isLatest ? 'opacity:0.5;' : ''}" ${!isLatest ? 'disabled' : ''}>⚡ 生成技能</button>
+          </div>
+        `;
       }
       html += `</div></div>`;
 
@@ -2927,12 +3066,22 @@ function renderCharsList($scroll) {
 
     function renderBagDetail(name) {
       const data = _.get(currentData, `背包.${name}`, {});
+      const isLatest = getCurrentMessageId() === getLastMessageId();
+      const disabledAttr = isLatest ? '' : ' disabled title="请在最新楼层操作"';
 
       $('#detail-name').text(`🎒 ${name}`);
       $('#detail-badge').text(`×${data.数量 || 0}`);
       $('#detail-owner').html('');
 
       const detailedDesc = ITEM_DESC_MAP[name] || data.描述 || '无描述';
+      var learnRarity = window.SKILL_LEARN_MACHINE_MAP[name];
+
+      var actionsHtml = '';
+      if (learnRarity && isLatest) {
+        actionsHtml = '<button class="wh-action-btn" id="btn-use-learn" style="background:linear-gradient(135deg,#a78bfa,#7c3aed);color:white;">🎓 使用学习机</button>';
+      }
+
+      $('#detail-actions').html(actionsHtml);
 
       $('#detail-scroll').html(`
         <div class="info-card">
@@ -2999,6 +3148,12 @@ function renderCharsList($scroll) {
 
     // === 技能生成系统 ===
     window.SKILL_RARITY_ORDER = ['N', '普通', '稀有', '史诗', '传说', '神话'];
+    window.SKILL_LEARN_MACHINE_MAP = {
+      '普通技能学习机': '普通',
+      '稀有技能学习机': '稀有',
+      '史诗技能学习机': '史诗',
+      '传说技能学习机': '传说'
+    };
     window.SKILL_PARAM_KEYS = ['系数','伤害类型','暴击率加成','吸血比例','命中率','灼烧概率','灼烧伤害','灼烧回合','中毒概率','中毒伤害','中毒回合','冰冻概率','冰冻回合','麻痹概率','麻痹回合','混乱概率','混乱回合','攻击加成','防御加成','特攻加成','特防加成','速度加成','命中加成','闪避加成','持续回合','治疗量','治疗比例','护盾值','护盾比例'];
     window.SLOT_LABELS = {
       1: { name: 'Ⅰ', desc: '低消耗攻击' },
@@ -3018,12 +3173,17 @@ function renderCharsList($scroll) {
       return 6;
     }
 
+    function getInitialSkillCount(quality) {
+      var map = { E: 1, D: 1, C: 2, B: 2, A: 3, S: 3 };
+      return map[quality] || 1;
+    }
+
     function rollPassive(slotIndex) {
       if (slotIndex === 1) return false;
       return Math.random() < 0.25;
     }
 
-    function buildSlotPrompt(charData, slotIndex, maxRarity, isPassive) {
+    function buildSlotPrompt(charData, slotIndex, maxRarity, isPassive, fixedRarity) {
       var element = charData.属性 || '无';
       var combatType = charData.战斗类型 || '均衡型';
       var quality = charData.品质 || 'E';
@@ -3034,7 +3194,7 @@ function renderCharsList($scroll) {
       var firstFormula = isPhysical ? 'physical_damage' : 'magic_damage';
       var firstElement = isPhysical ? '无' : element;
       var label = window.SLOT_LABELS[slotIndex];
-      var slotMaxRarity = slotIndex === 1 ? '史诗' : maxRarity;
+      var slotMaxRarity = slotIndex === 1 ? '史诗' : (fixedRarity || maxRarity);
 
       var slotLine = '### 槽位 ' + slotIndex + (label ? ' (' + label.name + ')' : '') + '\n';
       if (slotIndex === 1) {
@@ -3069,7 +3229,7 @@ function renderCharsList($scroll) {
         '- 治疗/buff/debuff/被动类: 基础威力可为0, 系数不适用\n' +
         '- 第一技能冷却必为0, 稀有度上限=史诗';
 
-      return '你是一个游戏技能生成器。必须严格遵循以下约束生成JSON格式的技能数据,不要输出其他文字。\n\n## 角色信息\n- 名称: ' + name + '\n- 元素属性: ' + element + '\n- 战斗类型: ' + combatType + '\n- 品质: ' + quality + '\n- 等级: ' + (charData.等级 || 1) + '\n- 攻击力: ' + atk + '\n- 特攻: ' + spa + '\n\n' + slotLine + rarityTable + '\n\n## 字段约束(必须遵守)\n\n1. name: 字符串,技能名称2~4个汉字\n\n2. 类型: 枚举值,只能取以下之一 → [' + typeEnum + ']\n\n3. 稀有度: 枚举值,只能取以下之一 → ["N","普通","稀有","史诗","传说","神话"]\n   上限: ' + slotMaxRarity + '\n\n4. 元素属性: 枚举值,只能取以下之一 → ["地","火","水","风","光","暗","无"]\n\n5. 消耗MP: 统一填0,引擎按稀有度自动扣除\n\n6. 冷却回合: 非负整数(0,1,2,3...)\n   被动/天赋/光环技能: 冷却回合必须=0\n\n7. 基础威力: 非负整数,伤害类技能必须>0,治疗/buff/debuff/被动类可为0\n\n8. 描述: 字符串,简短描述技能效果\n   攻击技能描述建议注明计算公式,如"(ATK×系数)+基础威力"\n\n9. 效果公式: 枚举值,只能取以下之一 → [' + formulaEnum + ']\n\n10. 目标类型: 枚举值,只能取以下之一 → [' + targetEnum + ']\n\n11. 数值参数: 对象,键只能从以下列表中选取:\n    ' + window.SKILL_PARAM_KEYS.join(', ') + '\n    值类型: 数字(整数或小数)\n    攻击技能必须包含系数字段\n    概率字段必须是0~1小数,命中率建议0.85~0.98,回合字段必须为正整数\n\n## 禁止项\n- 禁止创造"同时治疗和伤害"的技能(吸血请用drain_physical/drain_magic)\n- 禁止使用不在约束中的效果公式\n- 禁止使用不在列表中的数值参数键\n- 禁止缺少任何必填字段\n- 禁止技能包含复活/反弹/自爆/驱散/真实伤害/必定暴击/固定伤害值/一击必杀/斩杀线/偷取MP/禁止换人等引擎不支持的效果\n- 禁止自创元素属性或克制关系\n- 禁止被动技能造成伤害\n- 禁止条件自动选择目标(如"血量最低的敌人")\n- 禁止在描述中使用模糊词(如"大幅提升")\n- 禁止物理技能用SpA/元素技能用ATK\n\n## 输出格式\n只返回以下JSON,不要包含其他文字或markdown包裹:\n{\n  "name": "技能名",\n  "类型": "' + (isPassive ? '被动' : (slotIndex === 1 ? '主动' : '主动')) + '",\n  "稀有度": "' + slotMaxRarity + '",\n  "元素属性": "' + (slotIndex === 1 ? firstElement : (isPassive ? '无' : element)) + '",\n  "消耗MP": 0,\n  "冷却回合": ' + (slotIndex === 1 ? 0 : (isPassive ? 0 : 1)) + ',\n  "基础威力": ' + (isPassive ? 0 : 60) + ',\n  "描述": "技能效果描述",\n  "效果公式": "' + (isPassive ? 'buff' : firstFormula) + '",\n  "目标类型": "' + (isPassive ? 'self' : (slotIndex === 1 ? 'single_enemy' : 'single_enemy')) + '",\n  "数值参数": {\n    "系数": 0.8\n  }\n}';
+      return '你是一个游戏技能生成器。必须严格遵循以下约束生成JSON格式的技能数据,不要输出其他文字。\n\n## 角色信息\n- 名称: ' + name + '\n- 元素属性: ' + element + '\n- 战斗类型: ' + combatType + '\n- 品质: ' + quality + '\n- 等级: ' + (charData.等级 || 1) + '\n- 攻击力: ' + atk + '\n- 特攻: ' + spa + '\n\n' + slotLine + rarityTable + '\n\n## 字段约束(必须遵守)\n\n1. name: 字符串,技能名称2~4个汉字\n\n2. 类型: 枚举值,只能取以下之一 → [' + typeEnum + ']\n\n3. 稀有度: 枚举值,只能取以下之一 → ["N","普通","稀有","史诗","传说","神话"]\n   ' + (fixedRarity ? '锁定为: ' + fixedRarity + ' (学习机固定,不可变更)' : '上限: ' + slotMaxRarity) + '\n\n4. 元素属性: 枚举值,只能取以下之一 → ["地","火","水","风","光","暗","无"]\n\n5. 消耗MP: 统一填0,引擎按稀有度自动扣除\n\n6. 冷却回合: 非负整数(0,1,2,3...)\n   被动/天赋/光环技能: 冷却回合必须=0\n\n7. 基础威力: 非负整数,伤害类技能必须>0,治疗/buff/debuff/被动类可为0\n\n8. 描述: 字符串,简短描述技能效果\n   攻击技能描述建议注明计算公式,如"(ATK×系数)+基础威力"\n\n9. 效果公式: 枚举值,只能取以下之一 → [' + formulaEnum + ']\n\n10. 目标类型: 枚举值,只能取以下之一 → [' + targetEnum + ']\n\n11. 数值参数: 对象,键只能从以下列表中选取:\n    ' + window.SKILL_PARAM_KEYS.join(', ') + '\n    值类型: 数字(整数或小数)\n    攻击技能必须包含系数字段\n    概率字段必须是0~1小数,命中率建议0.85~0.98,回合字段必须为正整数\n\n## 禁止项\n- 禁止创造"同时治疗和伤害"的技能(吸血请用drain_physical/drain_magic)\n- 禁止使用不在约束中的效果公式\n- 禁止使用不在列表中的数值参数键\n- 禁止缺少任何必填字段\n- 禁止技能包含复活/反弹/自爆/驱散/真实伤害/必定暴击/固定伤害值/一击必杀/斩杀线/偷取MP/禁止换人等引擎不支持的效果\n- 禁止自创元素属性或克制关系\n- 禁止被动技能造成伤害\n- 禁止条件自动选择目标(如"血量最低的敌人")\n- 禁止在描述中使用模糊词(如"大幅提升")\n- 禁止物理技能用SpA/元素技能用ATK\n\n## 输出格式\n只返回以下JSON,不要包含其他文字或markdown包裹:\n{\n  "name": "技能名",\n  "类型": "' + (isPassive ? '被动' : (slotIndex === 1 ? '主动' : '主动')) + '",\n  "稀有度": "' + (fixedRarity || slotMaxRarity) + '",\n  "元素属性": "' + (slotIndex === 1 ? firstElement : (isPassive ? '无' : element)) + '",\n  "消耗MP": 0,\n  "冷却回合": ' + (slotIndex === 1 ? 0 : (isPassive ? 0 : 1)) + ',\n  "基础威力": ' + (isPassive ? 0 : 60) + ',\n  "描述": "技能效果描述",\n  "效果公式": "' + (isPassive ? 'buff' : firstFormula) + '",\n  "目标类型": "' + (isPassive ? 'self' : (slotIndex === 1 ? 'single_enemy' : 'single_enemy')) + '",\n  "数值参数": {\n    "系数": 0.8\n  }\n}';
     }
 
     function extractJSON(text) {
@@ -3129,9 +3289,9 @@ function renderCharsList($scroll) {
       return skill;
     }
 
-    async function generateSingleSkill(charName, charData, slotIndex, slotCount, isPassive) {
+    async function generateSingleSkill(charName, charData, slotIndex, slotCount, isPassive, fixedRarity) {
       var maxRarity = getMaxRarity(charData.品质 || 'E');
-      var prompt = buildSlotPrompt(charData, slotIndex, maxRarity, isPassive);
+      var prompt = buildSlotPrompt(charData, slotIndex, maxRarity, isPassive, fixedRarity);
       try {
         var result = await generateRaw({
           ordered_prompts: [{ role: 'system', content: prompt }],
@@ -3174,8 +3334,8 @@ function renderCharsList($scroll) {
       }
       var charData = currentData.角色数据[charName];
       var quality = charData.品质 || 'E';
-      var slotCount = getSkillSlotCount();
-      notify('正在为 ' + charName + ' 生成技能 (共' + slotCount + '槽位)...', 'info');
+      var slotCount = getInitialSkillCount(quality);
+      notify('正在为 ' + charName + ' 生成技能 (品质' + quality + ', ' + slotCount + '槽位)...', 'info');
       var skills = {};
       var successCount = 0;
       for (var i = 1; i <= slotCount; i++) {
@@ -3341,6 +3501,12 @@ function renderCharsList($scroll) {
           }
         });
 
+        $(document).on('click', '#btn-use-learn', function() {
+          var name = $('#detail-name').text().replace('🎒 ', '');
+          showLearnModal(name);
+        });
+        $(document).on('click', '#learn-modal-cancel', hideLearnModal);
+        $(document).on('click', '#learn-modal-confirm', confirmLearnSkill);
         $('#btn-back').on('click', goBack);
         $('#btn-refresh').on('click', function() {
           $(this).addClass('spinning');
@@ -3525,6 +3691,17 @@ function renderCharsList($scroll) {
           <div class="modal-btns">
             <button class="modal-btn cancel" id="claim-modal-cancel">取消</button>
             <button class="modal-btn confirm" id="claim-modal-confirm" style="background:linear-gradient(135deg,#22c55e,#16a34a);">领取</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-overlay" id="learn-modal">
+        <div class="modal-box" style="max-width:420px;">
+          <div class="modal-title" id="learn-modal-title">🎓 技能学习机</div>
+          <div class="modal-desc" id="learn-modal-body" style="white-space:normal;max-height:360px;overflow-y:auto;"></div>
+          <div class="modal-btns">
+            <button class="modal-btn cancel" id="learn-modal-cancel">取消</button>
+            <button class="modal-btn confirm" id="learn-modal-confirm" style="background:linear-gradient(135deg,#a78bfa,#7c3aed);display:none;">🎓 确认学习</button>
           </div>
         </div>
       </div>
