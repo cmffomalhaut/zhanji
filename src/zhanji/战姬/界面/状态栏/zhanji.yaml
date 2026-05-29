@@ -2400,6 +2400,7 @@ function renderCharsList($scroll) {
           return variables;
         }, { type: 'message' });
         populateCharacterData();
+        learnMachineLock[charName + '_' + slotIndex] = state.rarity;
         notify(charName + ' 槽位' + slotIndex + ' 已学习新技能 [' + (skill.name || '未知') + ']', 'success');
         hideLearnModal();
         renderCurrentTab();
@@ -2827,6 +2828,7 @@ function renderCharsList($scroll) {
     }
 
     var skillBackupCache = {};
+    var learnMachineLock = {};
     var archiveState = { charName: null, messageCount: 8 };
     var archiveCache = {};
 
@@ -2886,11 +2888,14 @@ function renderCharsList($scroll) {
 
       var content = archive;
       var match = content.match(/<senki_archive>([\s\S]*?)<\/senki_archive>/i);
-      if (match) {
+      if (match && match[1].trim()) {
         content = match[1].trim();
       } else {
-        content = content.replace(/<\/?(?:thinking|senki_archive)[^>]*>/gi, '');
-        content = content.replace(/<[^>]*>/g, '');
+        var hasOpen = /<senki_archive>/i.test(content);
+        var hasClose = /<\/senki_archive>/i.test(content);
+        if (hasOpen && !hasClose) content = '⚠ 生成错误: <senki_archive> 标签未闭合';
+        else if (!hasOpen) content = '⚠ 生成错误: 缺少 <senki_archive> 标签';
+        else content = '⚠ 生成错误: 标签内无内容';
       }
 
       $scroll.html(
@@ -3127,6 +3132,9 @@ function renderCharsList($scroll) {
           return variables;
         }, { type: 'message' });
         delete skillBackupCache[charName];
+        Object.keys(learnMachineLock).forEach(function(k) {
+          if (k.indexOf(charName + '_') === 0) delete learnMachineLock[k];
+        });
         populateCharacterData();
         renderCurrentTab();
         notify(charName + ' 技能已恢复到上次状态', 'success');
@@ -3814,6 +3822,9 @@ function renderCharsList($scroll) {
           return variables;
         }, { type: 'message' });
         populateCharacterData();
+        Object.keys(learnMachineLock).forEach(function(k) {
+          if (k.indexOf(charName + '_') === 0) delete learnMachineLock[k];
+        });
         notify(charName + ' 技能生成完成！成功' + successCount + '/' + slotCount, successCount === slotCount ? 'success' : 'warning');
       } catch(e) {
         console.error('技能数据写入失败:', e);
@@ -3833,7 +3844,8 @@ function renderCharsList($scroll) {
       var promptSlotIndex = !isNaN(slotIndex) ? slotIndex : 3;
       var isPassive = rollPassive(promptSlotIndex);
       notify('重铸 ' + displayName + (isPassive ? ' [被动]' : '') + '...', 'info');
-      var skill = await generateSingleSkill(charName, charData, promptSlotIndex, getSkillSlotCount(), isPassive);
+      var lockRarity = learnMachineLock[charName + '_' + slotIndex];
+      var skill = await generateSingleSkill(charName, charData, promptSlotIndex, getSkillSlotCount(), isPassive, lockRarity);
       if (skill) {
         try {
           await updateVariablesWith(function(variables) {
