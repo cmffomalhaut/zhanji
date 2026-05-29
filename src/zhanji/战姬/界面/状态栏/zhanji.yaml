@@ -3571,9 +3571,11 @@ function renderCharsList($scroll) {
       6: { name: 'Ⅵ', desc: '' }
     };
 
-    function getMaxRarity(quality) {
-      var map = { E: '普通', D: '稀有', C: '史诗', B: '传说', A: '传说', S: '神话', SS: '神话', SSS: '神话' };
-      return map[quality] || '普通';
+    function getSlotRarityLimit(quality, slotIndex) {
+      var t = slotIndex === 1
+        ? { E:'普通', D:'普通', C:'稀有', B:'稀有', A:'史诗', S:'传说' }
+        : { E:'普通', D:'普通', C:'稀有', B:'史诗', A:'传说', S:'神话' };
+      return t[quality] || '普通';
     }
 
     function getSkillSlotCount() {
@@ -3581,8 +3583,11 @@ function renderCharsList($scroll) {
     }
 
     function getInitialSkillCount(quality) {
-      var map = { E: 1, D: 1, C: 2, B: 2, A: 3, S: 3 };
-      return map[quality] || 1;
+      var base = { E:1, D:1, C:2, B:2, A:3, S:3 }[quality] || 1;
+      if (quality === 'D' && Math.random() < 0.5) base = 2;
+      if (quality === 'B' && Math.random() < 0.5) base = 3;
+      if (quality === 'S' && Math.random() < 0.5) base = 4;
+      return base;
     }
 
     function rollPassive(slotIndex) {
@@ -3590,7 +3595,7 @@ function renderCharsList($scroll) {
       return Math.random() < 0.25;
     }
 
-    function buildSlotPrompt(charData, slotIndex, maxRarity, isPassive, fixedRarity) {
+    function buildSlotPrompt(charData, slotIndex, isPassive, fixedRarity) {
       var element = charData.属性 || '无';
       var combatType = charData.战斗类型 || '均衡型';
       var quality = charData.品质 || 'E';
@@ -3601,11 +3606,11 @@ function renderCharsList($scroll) {
       var firstFormula = isPhysical ? 'physical_damage' : 'magic_damage';
       var firstElement = isPhysical ? '无' : element;
       var label = window.SLOT_LABELS[slotIndex];
-      var slotMaxRarity = slotIndex === 1 ? '史诗' : (fixedRarity || maxRarity);
+      var slotMaxRarity = fixedRarity || getSlotRarityLimit(quality, slotIndex);
 
       var slotLine = '### 槽位 ' + slotIndex + (label ? ' (' + label.name + ')' : '') + '\n';
       if (slotIndex === 1) {
-        slotLine += '【固定攻击位】\n- 元素属性=' + firstElement + ' (强制)\n- 类型=主动 (强制)\n- 消耗MP=0 (AI填0,引擎按稀有度自动扣除)\n- 冷却回合=0 (强制)\n- 效果公式=' + firstFormula + ' (强制)\n- 目标类型=single_enemy (强制)\n- 基础威力>0\n- 不可附加异常状态\n- ' + (isPhysical ? '物理技能,使用ATK计算,元素属性=无' : '元素技能,使用SpA计算,元素属性=角色元素') + '\n- 稀有度上限=史诗(强制)';
+        slotLine += '【固定攻击位】\n- 元素属性=' + firstElement + ' (强制)\n- 类型=主动 (强制)\n- 消耗MP=0 (AI填0,引擎按稀有度自动扣除)\n- 冷却回合=0 (强制)\n- 效果公式=' + firstFormula + ' (强制)\n- 目标类型=single_enemy (强制)\n- 基础威力>0\n- 不可附加异常状态\n- ' + (isPhysical ? '物理技能,使用ATK计算,元素属性=无' : '元素技能,使用SpA计算,元素属性=角色元素') + '\n- 稀有度上限=' + getSlotRarityLimit(quality, 1) + '(强制)';
       } else if (isPassive) {
         slotLine += '【被动/天赋/光环】\n- 类型=被动 或 天赋 或 光环\n- 消耗MP=0 (强制)\n- 冷却回合=0 (强制)\n- 基础威力=0 (强制)\n- 效果公式=buff 或 debuff\n- 目标类型=self 或 ally 或 all_allies\n- 元素属性=无\n- 数值参数中使用持续回合/攻击加成/防御加成等buff参数\n- 引擎限制:被动仅有3种触发时机(on_attack/on_hit/on_low_hp),on_low_hp仅识别防御加成';
       } else {
@@ -3634,7 +3639,7 @@ function renderCharsList($scroll) {
         '| 神话 | 1.3~1.6 | 160~200+ | 45 | 3~4 |\n' +
         '- 攻击技能的系数和基础威力必须在上表范围内\n' +
         '- 治疗/buff/debuff/被动类: 基础威力可为0, 系数不适用\n' +
-        '- 第一技能冷却必为0, 稀有度上限=史诗';
+        '- 第一技能冷却必为0, 稀有度上限=' + getSlotRarityLimit(quality, 1);
 
       return '你是一个游戏技能生成器。必须严格遵循以下约束生成JSON格式的技能数据,不要输出其他文字。\n\n## 角色信息\n- 名称: ' + name + '\n- 元素属性: ' + element + '\n- 战斗类型: ' + combatType + '\n- 品质: ' + quality + '\n- 等级: ' + (charData.等级 || 1) + '\n- 攻击力: ' + atk + '\n- 特攻: ' + spa + '\n\n' + slotLine + rarityTable + '\n\n## 字段约束(必须遵守)\n\n1. name: 字符串,技能名称2~4个汉字\n\n2. 类型: 枚举值,只能取以下之一 → [' + typeEnum + ']\n\n3. 稀有度: 枚举值,只能取以下之一 → ["N","普通","稀有","史诗","传说","神话"]\n   ' + (fixedRarity ? '锁定为: ' + fixedRarity + ' (学习机固定,不可变更)' : '上限: ' + slotMaxRarity) + '\n\n4. 元素属性: 枚举值,只能取以下之一 → ["地","火","水","风","光","暗","无"]\n\n5. 消耗MP: 统一填0,引擎按稀有度自动扣除\n\n6. 冷却回合: 非负整数(0,1,2,3...)\n   被动/天赋/光环技能: 冷却回合必须=0\n\n7. 基础威力: 非负整数,伤害类技能必须>0,治疗/buff/debuff/被动类可为0\n\n8. 描述: 字符串,简短描述技能效果\n   攻击技能描述建议注明计算公式,如"(ATK×系数)+基础威力"\n\n9. 效果公式: 枚举值,只能取以下之一 → [' + formulaEnum + ']\n\n10. 目标类型: 枚举值,只能取以下之一 → [' + targetEnum + ']\n\n11. 数值参数: 对象,键只能从以下列表中选取:\n    ' + window.SKILL_PARAM_KEYS.join(', ') + '\n    值类型: 数字(整数或小数)\n    攻击技能必须包含系数字段\n    概率字段必须是0~1小数,命中率建议0.85~0.98,回合字段必须为正整数\n\n## 禁止项\n- 禁止创造"同时治疗和伤害"的技能(吸血请用drain_physical/drain_magic)\n- 禁止使用不在约束中的效果公式\n- 禁止使用不在列表中的数值参数键\n- 禁止缺少任何必填字段\n- 禁止技能包含复活/反弹/自爆/驱散/真实伤害/必定暴击/固定伤害值/一击必杀/斩杀线/偷取MP/禁止换人等引擎不支持的效果\n- 禁止自创元素属性或克制关系\n- 禁止被动技能造成伤害\n- 禁止条件自动选择目标(如"血量最低的敌人")\n- 禁止在描述中使用模糊词(如"大幅提升")\n- 禁止物理技能用SpA/元素技能用ATK\n\n## 输出格式\n只返回以下JSON,不要包含其他文字或markdown包裹:\n{\n  "name": "技能名",\n  "类型": "' + (isPassive ? '被动' : (slotIndex === 1 ? '主动' : '主动')) + '",\n  "稀有度": "' + (fixedRarity || slotMaxRarity) + '",\n  "元素属性": "' + (slotIndex === 1 ? firstElement : (isPassive ? '无' : element)) + '",\n  "消耗MP": 0,\n  "冷却回合": ' + (slotIndex === 1 ? 0 : (isPassive ? 0 : 1)) + ',\n  "基础威力": ' + (isPassive ? 0 : 60) + ',\n  "描述": "技能效果描述",\n  "效果公式": "' + (isPassive ? 'buff' : firstFormula) + '",\n  "目标类型": "' + (isPassive ? 'self' : (slotIndex === 1 ? 'single_enemy' : 'single_enemy')) + '",\n  "数值参数": {\n    "系数": 0.8\n  }\n}';
     }
@@ -3655,12 +3660,14 @@ function renderCharsList($scroll) {
       throw new Error('无法解析JSON: ' + text.slice(0, 100));
     }
 
-    function validateSkill(skill, slotIndex, charData, maxRarity) {
+    function validateSkill(skill, slotIndex, charData) {
       if (!skill || typeof skill !== 'object') skill = {};
       if (!skill.name || typeof skill.name !== 'string') skill.name = '技能' + slotIndex;
       if (!['主动', '被动', '天赋', '光环'].includes(skill.类型)) skill.类型 = '主动';
       var isPassiveType = (skill.类型 === '被动' || skill.类型 === '天赋' || skill.类型 === '光环');
       var isSlot1 = slotIndex === 1;
+      var quality = charData.品质 || 'E';
+      var slotMaxRarity = getSlotRarityLimit(quality, slotIndex);
       if (isSlot1) {
         var isPhysical = (charData.攻击力 || 0) >= (charData.特攻 || 0);
         skill.类型 = '主动';
@@ -3671,13 +3678,13 @@ function renderCharsList($scroll) {
         skill.效果公式 = slot1Formula;
         skill.元素属性 = slot1Element;
         if (typeof skill.基础威力 !== 'number' || skill.基础威力 <= 0) skill.基础威力 = 30;
-        var epicIdx = window.SKILL_RARITY_ORDER.indexOf('史诗');
+        var s1maxIdx = window.SKILL_RARITY_ORDER.indexOf(slotMaxRarity);
         var rIdx = window.SKILL_RARITY_ORDER.indexOf(skill.稀有度);
-        if (rIdx === -1 || rIdx > epicIdx) skill.稀有度 = '普通';
+        if (rIdx === -1 || rIdx > s1maxIdx) skill.稀有度 = '普通';
       } else {
-        var maxIdx = window.SKILL_RARITY_ORDER.indexOf(maxRarity);
+        var maxIdx = window.SKILL_RARITY_ORDER.indexOf(slotMaxRarity);
         var rIdx = window.SKILL_RARITY_ORDER.indexOf(skill.稀有度);
-        if (rIdx === -1 || rIdx > maxIdx) skill.稀有度 = maxRarity;
+        if (rIdx === -1 || rIdx > maxIdx) skill.稀有度 = slotMaxRarity;
         if (!['地','火','水','风','光','暗','无'].includes(skill.元素属性)) skill.元素属性 = charData.属性 || '无';
         if (typeof skill.冷却回合 !== 'number' || skill.冷却回合 < 0) skill.冷却回合 = 0;
         if (isPassiveType) { skill.消耗MP = 0; skill.冷却回合 = 0; skill.基础威力 = 0; }
@@ -3697,8 +3704,7 @@ function renderCharsList($scroll) {
     }
 
     async function generateSingleSkill(charName, charData, slotIndex, slotCount, isPassive, fixedRarity) {
-      var maxRarity = getMaxRarity(charData.品质 || 'E');
-      var prompt = buildSlotPrompt(charData, slotIndex, maxRarity, isPassive, fixedRarity);
+      var prompt = buildSlotPrompt(charData, slotIndex, isPassive, fixedRarity);
       try {
         var result = await generateRaw({
           ordered_prompts: [{ role: 'system', content: prompt }],
@@ -3707,7 +3713,7 @@ function renderCharsList($scroll) {
         });
         var text = typeof result === 'string' ? result : (result.content || '');
         var skill = extractJSON(text);
-        validateSkill(skill, slotIndex, charData, maxRarity);
+        validateSkill(skill, slotIndex, charData);
         if (isPassive) {
           skill.类型 = '被动';
           skill.消耗MP = 0;
@@ -3725,7 +3731,7 @@ function renderCharsList($scroll) {
           });
           var text2 = typeof result2 === 'string' ? result2 : (result2.content || '');
           var skill2 = extractJSON(text2);
-          validateSkill(skill2, slotIndex, charData, maxRarity);
+          validateSkill(skill2, slotIndex, charData);
           return skill2;
         } catch (e2) {
           console.error('槽位' + slotIndex + '重试失败:', e2);
