@@ -2848,9 +2848,13 @@ function renderCharsList($scroll) {
       );
 
       var content = archive;
-      content = content.replace(/<\/?senki_archive>/gi, '');
-      content = content.replace(/<\/?thinking>/gi, '');
-      content = content.replace(/<[^>]*>/g, '');
+      var match = content.match(/<senki_archive>([\s\S]*?)<\/senki_archive>/i);
+      if (match) {
+        content = match[1].trim();
+      } else {
+        content = content.replace(/<\/?(?:thinking|senki_archive)[^>]*>/gi, '');
+        content = content.replace(/<[^>]*>/g, '');
+      }
 
       $scroll.html(
         '<div class="archive-card">' + content.replace(/\n/g, '<br>') + '</div>'
