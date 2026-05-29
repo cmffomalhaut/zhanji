@@ -2254,7 +2254,7 @@ function renderCharsList($scroll) {
       if (!rarity) { notify('未知的学习机', 'error'); return; }
       var chars = [];
       _.each(currentData.角色数据, function(c, name) {
-        if (c && c.名称) chars.push(name);
+        if (c && c.品质) chars.push(name);
       });
       if (chars.length === 0) { notify('没有可使用的战姬', 'warning'); return; }
       learnState = { itemName: itemName, rarity: rarity, step: 0, chars: chars, selectedChar: null, selectedSlot: null };
@@ -2290,8 +2290,8 @@ function renderCharsList($scroll) {
         });
       } else if (step === 2) {
         var charName = learnState.selectedChar;
-        var charName = learnState.selectedChar;
-        var charData = currentData.角色数据[charName];
+        var charData = currentData.角色数据 && currentData.角色数据[charName];
+        if (!charData) { notify('角色数据不存在', 'error'); hideLearnModal(); return; }
         var skills = charData.技能 || {};
         var entries = Object.entries(skills);
         var lSlotData = {};
