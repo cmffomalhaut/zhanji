@@ -1698,6 +1698,52 @@ function renderCharsList($scroll) {
     var archiveState = { charName: null, messageCount: 8 };
     var archiveCache = {};
 
+    // ============ 羁绊档案 SVG 装饰辅助函数 ============
+
+    function _archiveCornerSVG(cls) {
+      return '<svg class="senki-archive-corner ' + cls + '" viewBox="0 0 70 70" xmlns="http://www.w3.org/2000/svg">' +
+        '<path d="M5 5 C15 15 25 30 30 45 C33 55 30 60 25 65" fill="none" stroke="#c9a050" stroke-width="1.8" stroke-linecap="round"/>' +
+        '<path d="M12 12 C20 20 27 32 30 42 C32 50 29 54 26 58" fill="none" stroke="#e0c060" stroke-width="0.7" opacity="0.5"/>' +
+        '<path d="M5 1 L9 5 L5 9 L1 5 Z" fill="#c9a050" opacity="0.7"/>' +
+        '<circle cx="18" cy="22" r="1.2" fill="#dbb860" opacity="0.5"/>' +
+        '<circle cx="28" cy="38" r="1" fill="#dbb860" opacity="0.4"/>' +
+        '<circle cx="33" cy="52" r="0.8" fill="#dbb860" opacity="0.3"/>' +
+        '</svg>';
+    }
+
+    function _archiveDividerSVG() {
+      return '<svg class="senki-archive-divider-svg" viewBox="0 0 280 24" xmlns="http://www.w3.org/2000/svg">' +
+        '<line x1="20" y1="12" x2="115" y2="12" stroke="#c9a050" stroke-width="0.6" opacity="0.4"/>' +
+        '<path d="M135 7 L140 12 L135 17 L130 12 Z" fill="#c9a050" opacity="0.7"/>' +
+        '<path d="M135 9 L138 12 L135 15 L132 12 Z" fill="#e8c860" opacity="0.5"/>' +
+        '<line x1="165" y1="12" x2="260" y2="12" stroke="#c9a050" stroke-width="0.6" opacity="0.4"/>' +
+        '<circle cx="40" cy="12" r="1.2" fill="#c9a050" opacity="0.4"/>' +
+        '<circle cx="80" cy="12" r="1.2" fill="#c9a050" opacity="0.4"/>' +
+        '<circle cx="200" cy="12" r="1.2" fill="#c9a050" opacity="0.4"/>' +
+        '<circle cx="240" cy="12" r="1.2" fill="#c9a050" opacity="0.4"/>' +
+        '</svg>';
+    }
+
+    function _archiveBottomOrnamentSVG() {
+      return '<svg class="senki-archive-bottom-ornament" viewBox="0 0 280 20" xmlns="http://www.w3.org/2000/svg">' +
+        '<path d="M60 6 Q100 16 140 6 Q180 16 220 6" fill="none" stroke="#c9a050" stroke-width="0.7" opacity="0.4"/>' +
+        '<path d="M80 10 Q120 6 140 10 Q160 6 200 10" fill="none" stroke="#e0c060" stroke-width="0.4" opacity="0.3"/>' +
+        '<path d="M137 11 L140 14 L143 11 L140 8 Z" fill="#c9a050" opacity="0.4"/>' +
+        '</svg>';
+    }
+
+    function _archiveFourCorners() {
+      return _archiveCornerSVG('corner-tl') + _archiveCornerSVG('corner-tr') +
+             _archiveCornerSVG('corner-bl') + _archiveCornerSVG('corner-br');
+    }
+
+    function formatArchiveContent(content) {
+      content = content.replace(/═{3,}/g, '<span class="archive-sep">$&</span>');
+      content = content.replace(/◆\s*(.+)/g, '<span class="archive-header">◆ $1</span>');
+      content = content.replace(/^(.+?[：:])\s*(.+)$/gm, '<span class="archive-label">$1</span><span class="archive-value">$2</span>');
+      return content;
+    }
+
     function showBondArchive(charName) {
       var data = _.get(currentData, '角色数据.' + charName, null);
       if (!data) { notify('角色数据不存在', 'error'); return; }
@@ -1721,15 +1767,18 @@ function renderCharsList($scroll) {
       $('#detail-actions').html('');
 
       $scroll.html(
-        '<div style="text-align:center;padding:20px;">' +
-        '<div style="color:#94a3b8;font-size:13px;margin-bottom:12px;">还未生成羁绊档案</div>' +
-        '<div style="margin-bottom:12px;">' +
-        '<label style="color:#cbd5e1;font-size:12px;">选择作为上下文的最近楼层数: </label>' +
-        '<input type="number" id="archive-msg-count" value="8" min="0" max="12" style="width:60px;padding:4px 8px;border-radius:4px;border:1px solid #475569;background:#1e293b;color:#e2e8f0;font-size:13px;text-align:center;">' +
-        '<span style="color:#64748b;font-size:11px;margin-left:4px;">(0-12)</span>' +
+        '<div class="senki-archive-prompt">' +
+        _archiveFourCorners() +
+        '<div class="senki-archive-prompt-title">✦ 羁 绊 档 案 ✦</div>' +
+        '<div class="senki-archive-prompt-char">' + charName + '</div>' +
+        '<div class="senki-archive-prompt-desc">还未生成羁绊档案</div>' +
+        '<div class="senki-archive-prompt-form">' +
+        '<label>选择上下文楼层数</label>' +
+        '<input type="number" id="archive-msg-count" value="8" min="0" max="12">' +
+        '<span>(0-12)</span>' +
         '</div>' +
-        (isLatest ? '' : '<div style="color:#ef4444;font-size:11px;margin-bottom:8px;">⚠ 请在最新楼层操作</div>') +
-        '<button class="archive-btn" id="btn-generate-archive" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;"' + (isLatest ? '' : ' disabled') + '>🎯 开始生成</button>' +
+        (isLatest ? '' : '<div class="senki-archive-prompt-warn">⚠ 请在最新楼层操作</div>') +
+        '<button class="senki-archive-btn" id="btn-generate-archive"' + (isLatest ? '' : ' disabled') + '>✦ 开 始 生 成 ✦</button>' +
         '</div>'
       );
 
@@ -1749,13 +1798,14 @@ function renderCharsList($scroll) {
       $('#detail-badge').text(charName);
       $('#detail-owner').html('');
       $('#detail-actions').html(
-        '<button class="archive-btn" id="btn-refresh-archive" style="background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;font-size:11px;padding:4px 10px;"' + (isLatest ? '' : ' disabled') + '>🔄 刷新</button>'
+        '<button class="senki-archive-btn senki-archive-btn-sm" id="btn-refresh-archive"' + (isLatest ? '' : ' disabled') + '>🔄 刷新</button>'
       );
 
       var content = archive;
       var match = content.match(/<senki_archive>([\s\S]*?)<\/senki_archive>/i);
       if (match && match[1].trim()) {
         content = match[1].trim();
+        content = formatArchiveContent(content);
       } else {
         var hasOpen = /<senki_archive>/i.test(content);
         var hasClose = /<\/senki_archive>/i.test(content);
@@ -1765,7 +1815,14 @@ function renderCharsList($scroll) {
       }
 
       $scroll.html(
-        '<div class="archive-card">' + content.replace(/\n/g, '<br>') + '</div>'
+        '<div class="senki-archive-frame">' +
+        _archiveFourCorners() +
+        '<div class="senki-archive-title">羁 绊 档 案</div>' +
+        '<div class="senki-archive-char-name">' + charName + '</div>' +
+        _archiveDividerSVG() +
+        '<div class="senki-archive-content">' + content.replace(/\n/g, '<br>') + '</div>' +
+        _archiveBottomOrnamentSVG() +
+        '</div>'
       );
 
       $('#btn-refresh-archive').off('click').on('click', function() {
@@ -1778,7 +1835,7 @@ function renderCharsList($scroll) {
       if (getCurrentMessageId() !== getLastMessageId()) { notify('请在最新楼层操作', 'warning'); return; }
 
       var $scroll = $('#detail-scroll');
-      $scroll.html('<div style="text-align:center;padding:30px;color:#94a3b8;">⏳ 正在生成羁绊档案（使用最近 ' + messageCount + ' 条聊天记录作为上下文）...</div>');
+      $scroll.html('<div class="senki-archive-loading"><div class="senki-archive-loading-icon">&#9878;</div><div class="senki-archive-loading-text">正在生成羁绊档案（使用最近 ' + messageCount + ' 条聊天记录作为上下文）...</div></div>');
 
       try {
         var charData = _.get(currentData, '角色数据.' + charName, {});
@@ -1953,7 +2010,7 @@ function renderCharsList($scroll) {
         }
 
         if (!archiveOk || !/<senki_archive>/i.test(archiveText)) {
-          $scroll.html('<div style="text-align:center;padding:20px;color:#94a3b8;">⚠ 格式异常，正在重试...</div>');
+          $scroll.html('<div class="senki-archive-loading"><div class="senki-archive-loading-icon">&#9878;</div><div class="senki-archive-loading-text">格式异常，正在重试...</div></div>');
           try {
             var result2 = await generateRaw({
               ordered_prompts: [{ role: 'system', content: archivePrompt + '\n\n【重要】输出必须包含<senki_archive>标签包裹档案正文。只返回JSON不要思考过程。' }],
@@ -1978,9 +2035,9 @@ function renderCharsList($scroll) {
       } catch(e) {
         console.error('羁绊档案生成失败:', e);
         $scroll.html(
-          '<div style="text-align:center;padding:20px;">' +
-          '<div style="color:#ef4444;font-size:12px;margin-bottom:8px;">生成失败: ' + (e.message || '未知错误') + '</div>' +
-          '<button class="archive-btn" id="btn-retry-archive" style="background:#6366f1;color:#fff;">🔄 重试</button>' +
+          '<div class="senki-archive-error">' +
+          '<div style="color:#ef4444;font-size:12px;margin-bottom:12px;">生成失败: ' + (e.message || '未知错误') + '</div>' +
+          '<button class="senki-archive-btn senki-archive-btn-sm" id="btn-retry-archive">🔄 重试</button>' +
           '</div>'
         );
         $('#btn-retry-archive').off('click').on('click', function() {
@@ -2349,7 +2406,7 @@ function renderCharsList($scroll) {
       var hasArchive = !!archiveCache[name];
       var archiveBtnText = hasArchive ? '📖 查看羁绊档案' : '📖 生成羁绊档案';
       html += '<div style="padding:8px 0;text-align:center;">' +
-        '<button class="archive-btn" id="btn-bond-archive" data-char-name="' + name + '" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;">' + archiveBtnText + '</button>' +
+        '<button class="senki-archive-btn" id="btn-bond-archive" data-char-name="' + name + '">' + archiveBtnText + '</button>' +
         '</div>';
 
       var hasBackup = !!skillBackupCache[name];

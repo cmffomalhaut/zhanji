@@ -628,6 +628,244 @@
     .archive-btn:hover { filter:brightness(1.15); }
     .archive-btn:disabled { opacity:0.5; cursor:not-allowed; filter:none; }
 
+    /* ==================== 羁绊档案 - 华丽红金风格 ==================== */
+
+    /* 档案主体框架 - 深红底金边 */
+    .senki-archive-frame {
+      position:relative;
+      background:linear-gradient(175deg,#0d0306 0%,#1a0810 25%,#240e16 50%,#1a0810 75%,#0d0306 100%);
+      border:2px solid #7a2e3e;
+      outline:1px solid #b8860b;
+      outline-offset:-6px;
+      padding:28px 20px 20px;
+      margin:12px 4px 30px;
+      box-shadow:0 0 20px rgba(160,40,40,0.25),inset 0 1px 12px rgba(0,0,0,0.4),inset 0 0 30px rgba(100,20,20,0.12);
+      overflow:hidden;
+      animation:archive-glow 3.5s ease-in-out infinite;
+    }
+    @keyframes archive-glow {
+      0%,100% { box-shadow:0 0 10px rgba(160,50,40,0.2),inset 0 0 15px rgba(0,0,0,0.3); }
+      50% { box-shadow:0 0 28px rgba(200,70,50,0.35),inset 0 0 20px rgba(0,0,0,0.3); }
+    }
+
+    /* 四角SVG花纹定位 */
+    .senki-archive-corner {
+      position:absolute;
+      width:70px;
+      height:70px;
+      pointer-events:none;
+      z-index:2;
+    }
+    .senki-archive-corner.corner-tl { top:0; left:0; }
+    .senki-archive-corner.corner-tr { top:0; right:0; transform:scaleX(-1); }
+    .senki-archive-corner.corner-bl { bottom:0; left:0; transform:scaleY(-1); }
+    .senki-archive-corner.corner-br { bottom:0; right:0; transform:scale(-1,-1); }
+
+    /* 档案标题 */
+    .senki-archive-title {
+      text-align:center;
+      font-size:18px;
+      font-weight:bold;
+      color:#e8c776;
+      letter-spacing:8px;
+      text-shadow:0 0 14px rgba(200,140,50,0.5),0 2px 3px rgba(0,0,0,0.6);
+      padding-bottom:2px;
+      position:relative;
+      z-index:1;
+    }
+    .senki-archive-char-name {
+      text-align:center;
+      font-size:12px;
+      color:#c9a050;
+      letter-spacing:2px;
+      margin-top:4px;
+      position:relative;
+      z-index:1;
+    }
+
+    /* 装饰分割线SVG */
+    .senki-archive-divider-svg {
+      display:block;
+      width:100%;
+      height:24px;
+      margin:10px 0 14px;
+      position:relative;
+      z-index:1;
+    }
+
+    /* 档案正文内容区 */
+    .senki-archive-content {
+      font-size:12px;
+      line-height:1.85;
+      color:#e2d5c8;
+      position:relative;
+      z-index:1;
+      max-height:400px;
+      overflow-y:auto;
+      padding:10px 0;
+      scrollbar-width:thin;
+      scrollbar-color:#7a2e3e transparent;
+    }
+    .senki-archive-content::-webkit-scrollbar { width:4px; }
+    .senki-archive-content::-webkit-scrollbar-track { background:transparent; }
+    .senki-archive-content::-webkit-scrollbar-thumb { background:#7a2e3e; border-radius:2px; }
+
+    .senki-archive-content .archive-sep {
+      color:#8b4513;
+      font-size:8px;
+      letter-spacing:3px;
+      opacity:0.7;
+    }
+    .senki-archive-content .archive-header {
+      color:#e8c860;
+      font-weight:bold;
+      font-size:13px;
+      display:block;
+      margin:8px 0 4px;
+      text-shadow:0 0 8px rgba(200,140,50,0.4);
+    }
+    .senki-archive-content .archive-label { color:#c9a050; font-weight:bold; }
+    .senki-archive-content .archive-value { color:#e2d5c8; }
+
+    /* 底部装饰 */
+    .senki-archive-bottom-ornament {
+      display:block;
+      width:100%;
+      height:20px;
+      margin-top:6px;
+      position:relative;
+      z-index:1;
+    }
+
+    /* ====== 生成提示页面 ====== */
+    .senki-archive-prompt {
+      position:relative;
+      background:linear-gradient(175deg,#0d0306 0%,#1a0810 50%,#0d0306 100%);
+      border:2px solid #7a2e3e;
+      outline:1px solid #b8860b;
+      outline-offset:-5px;
+      padding:24px 20px 20px;
+      margin:12px 4px;
+      text-align:center;
+      box-shadow:0 0 15px rgba(160,40,40,0.2),inset 0 0 15px rgba(0,0,0,0.3);
+      animation:archive-glow 3.5s ease-in-out infinite;
+    }
+    .senki-archive-prompt-title {
+      font-size:16px;
+      font-weight:bold;
+      color:#e8c776;
+      letter-spacing:6px;
+      text-shadow:0 0 10px rgba(200,140,50,0.5);
+      margin-bottom:6px;
+    }
+    .senki-archive-prompt-char {
+      font-size:13px;
+      color:#c9a050;
+      margin-bottom:16px;
+      letter-spacing:2px;
+    }
+    .senki-archive-prompt-desc {
+      color:#9a7a8a;
+      font-size:12px;
+      margin-bottom:16px;
+    }
+    .senki-archive-prompt-form {
+      margin-bottom:16px;
+    }
+    .senki-archive-prompt-form label {
+      color:#cbd5e1;
+      font-size:12px;
+      margin-right:6px;
+    }
+    .senki-archive-prompt-form input {
+      width:50px;
+      padding:4px 8px;
+      border-radius:3px;
+      border:1px solid #7a2e3e;
+      background:#1d0810;
+      color:#e8d5c8;
+      font-size:13px;
+      text-align:center;
+      font-family:inherit;
+    }
+    .senki-archive-prompt-form span {
+      color:#6b5060;
+      font-size:11px;
+      margin-left:4px;
+    }
+    .senki-archive-prompt-warn {
+      color:#ef4444;
+      font-size:11px;
+      margin-bottom:12px;
+    }
+
+    /* ====== 按钮 ====== */
+    .senki-archive-btn {
+      display:inline-block;
+      background:linear-gradient(180deg,#8b1a1a 0%,#5c1010 50%,#3d0808 100%);
+      color:#f0d090;
+      border:1.5px solid #c9a050;
+      border-radius:3px;
+      padding:10px 28px;
+      font-size:14px;
+      font-weight:bold;
+      cursor:pointer;
+      letter-spacing:3px;
+      text-shadow:0 1px 2px rgba(0,0,0,0.5);
+      box-shadow:0 0 10px rgba(180,60,40,0.3);
+      transition:all 0.25s;
+      font-family:inherit;
+    }
+    .senki-archive-btn:hover {
+      background:linear-gradient(180deg,#a82020 0%,#701515 50%,#4d0d0d 100%);
+      box-shadow:0 0 22px rgba(200,60,40,0.5);
+      transform:translateY(-1px);
+      color:#ffe8a0;
+    }
+    .senki-archive-btn:disabled {
+      opacity:0.35;
+      cursor:not-allowed;
+      filter:grayscale(0.4);
+    }
+    .senki-archive-btn-sm {
+      padding:5px 14px;
+      font-size:11px;
+      letter-spacing:1.5px;
+    }
+
+    /* ====== 加载中 & 错误状态 ====== */
+    .senki-archive-loading {
+      text-align:center;
+      padding:30px 20px;
+      background:linear-gradient(175deg,#0d0306 0%,#1a0810 100%);
+      border:1px solid #5a1e2e;
+      border-radius:4px;
+      margin:12px 4px;
+      box-shadow:0 0 10px rgba(160,40,40,0.15);
+    }
+    .senki-archive-loading-icon {
+      font-size:24px;
+      margin-bottom:10px;
+      animation:spin 1.5s linear infinite;
+    }
+    @keyframes spin {
+      from { transform:rotate(0deg); }
+      to { transform:rotate(360deg); }
+    }
+    .senki-archive-loading-text {
+      color:#9a7a8a;
+      font-size:12px;
+    }
+    .senki-archive-error {
+      text-align:center;
+      padding:20px;
+      background:linear-gradient(175deg,#0d0306 0%,#1a0810 100%);
+      border:1px solid #5a1e2e;
+      border-radius:4px;
+      margin:12px 4px;
+      box-shadow:0 0 10px rgba(160,40,40,0.15);
+    }
+
     .equip-item {
       display: flex;
       align-items: center;
