@@ -2293,9 +2293,23 @@ function renderCharsList($scroll) {
         var charName = learnState.selectedChar;
         var charData = currentData.角色数据[charName];
         var skills = charData.技能 || {};
+        var entries = Object.entries(skills);
+        var lSlotData = {};
+        var lUnnamed = [];
+        entries.forEach(function(_ref) {
+          var k = _ref[0], v = _ref[1];
+          var m = k.match(/^槽位_(\d+)$/);
+          if (m) { var sn = parseInt(m[1], 10); if (sn >= 2 && sn <= 6) { lSlotData[sn] = v; return; } }
+          lUnnamed.push(v);
+        });
+        var lnSlot = 2;
+        lUnnamed.forEach(function(v) {
+          while (lSlotData[lnSlot] && lnSlot <= 6) lnSlot++;
+          if (lnSlot <= 6) { lSlotData[lnSlot] = v; lnSlot++; }
+        });
         var html = '<div style="margin-bottom:8px;font-size:13px;color:#94a3b8;">为 <b>' + charName + '</b> 选择要替换的槽位:</div>';
         for (var i = 2; i <= 6; i++) {
-          var sk = skills['槽位_' + i] || skills[String(i)] || skills['技能_' + i];
+          var sk = lSlotData[i] || null;
           var currName = sk ? (sk.name || '未生成') : '空';
           var currRarity = sk ? (sk.稀有度 || '-') : '-';
           html += '<div class="list-item learn-slot-item" data-slot="' + i + '" style="cursor:pointer;">' +
@@ -3238,18 +3252,40 @@ function renderCharsList($scroll) {
           <div class="section-body" id="body-skills">
       `;
       var maxSlots = (typeof getSkillSlotCount === 'function' ? getSkillSlotCount() : 6);
-      var hasAnySkill = Object.keys(skills).length > 0;
+      var skillEntries = Object.entries(skills);
+      var hasAnySkill = skillEntries.length > 0;
+
+      var slotData = {};
+      var unnamed = [];
+
+      skillEntries.forEach(function(_ref) {
+        var key = _ref[0], val = _ref[1];
+        var m = key.match(/^槽位_(\d+)$/);
+        if (m) {
+          var sn = parseInt(m[1], 10);
+          if (sn >= 1 && sn <= maxSlots) { slotData[sn] = { skill: val, name: val.name || null }; return; }
+        }
+        unnamed.push({ skill: val, name: (val.name || key) });
+      });
+
+      var nextSlot = 1;
+      unnamed.forEach(function(item) {
+        while (slotData[nextSlot] && nextSlot <= maxSlots) nextSlot++;
+        if (nextSlot <= maxSlots) { slotData[nextSlot] = item; nextSlot++; }
+      });
+
       for (var slotNum = 1; slotNum <= maxSlots; slotNum++) {
+        var sd = slotData[slotNum];
         var skillKey = '槽位_' + slotNum;
-        var skill = skills[skillKey] || skills[String(slotNum)] || skills['技能_' + slotNum];
-        if (skill) {
+        if (sd) {
+          var skill = sd.skill;
           var label = window.SLOT_LABELS && window.SLOT_LABELS[slotNum];
           var typeTag = getSkillTypeTag(skill.类型);
           var rarityTag = getRarityTag(skill.稀有度);
           var skillMp = skill.消耗MP || 0;
           var cd = skill.冷却回合 || 0;
           var power = skill.基础威力 || 0;
-          var displayName = skill.name || skillKey;
+          var displayName = sd.name || skill.name || skillKey;
 
           html += `
             <div class="skill-card${skill.稀有度 === '神话' ? ' mythic' : ''}">
