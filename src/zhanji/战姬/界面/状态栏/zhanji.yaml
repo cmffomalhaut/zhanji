@@ -2364,7 +2364,13 @@ function renderCharsList($scroll) {
           return;
         }
         await updateVariablesWith(function(variables) {
-          _.set(variables, 'stat_data.角色数据.' + charName + '.技能.' + slotKey, skill);
+          var oldSkills = _.get(variables, 'stat_data.角色数据.' + charName + '.技能', {});
+          var cleaned = {};
+          Object.keys(oldSkills).forEach(function(k) {
+            if (/^槽位_\d+$/.test(k)) { cleaned[k] = oldSkills[k]; }
+          });
+          cleaned[slotKey] = skill;
+          _.set(variables, 'stat_data.角色数据.' + charName + '.技能', cleaned);
           var bp = _.get(variables, 'stat_data.背包.' + state.itemName, {});
           if (bp.数量) {
             bp.数量 = (bp.数量 || 1) - 1;
@@ -3741,7 +3747,13 @@ function renderCharsList($scroll) {
       if (skill) {
         try {
           await updateVariablesWith(function(variables) {
-            _.set(variables, 'stat_data.角色数据.' + charName + '.技能.' + slotKey, skill);
+            var oldSkills = _.get(variables, 'stat_data.角色数据.' + charName + '.技能', {});
+            var cleaned = {};
+            Object.keys(oldSkills).forEach(function(k) {
+              if (/^槽位_\d+$/.test(k)) { cleaned[k] = oldSkills[k]; }
+            });
+            cleaned[slotKey] = skill;
+            _.set(variables, 'stat_data.角色数据.' + charName + '.技能', cleaned);
             return variables;
           }, { type: 'message' });
           populateCharacterData();
