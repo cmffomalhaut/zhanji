@@ -3066,19 +3066,43 @@ function renderCharsList($scroll) {
           '务必执行步骤7的最终校验，确保档案质量。'
         ].join('\n');
 
-        var result = await generateRaw({
-          ordered_prompts: [{ role: 'system', content: archivePrompt }],
-          should_silence: true,
-          temperature: 0.85
-        });
+        var archiveOk = false;
+        var archiveText = '';
 
-        var text = typeof result === 'string' ? result : (result.content || '');
-        if (!text) throw new Error('生成结果为空');
+        try {
+          var result = await generateRaw({
+            ordered_prompts: [{ role: 'system', content: archivePrompt }],
+            should_silence: true,
+            temperature: 0.85
+          });
+          var text = typeof result === 'string' ? result : (result.content || '');
+          if (text) { archiveText = text; archiveOk = true; }
+        } catch(e) {
+          console.error('羁绊档案生成第1次失败:', e);
+        }
 
-        archiveCache[charName] = text;
+        if (!archiveOk || !/<senki_archive>/i.test(archiveText)) {
+          $scroll.html('<div style="text-align:center;padding:20px;color:#94a3b8;">⚠ 格式异常，正在重试...</div>');
+          try {
+            var result2 = await generateRaw({
+              ordered_prompts: [{ role: 'system', content: archivePrompt + '\n\n【重要】输出必须包含<senki_archive>标签包裹档案正文。只返回JSON不要思考过程。' }],
+              should_silence: true,
+              temperature: 0.7
+            });
+            var text2 = typeof result2 === 'string' ? result2 : (result2.content || '');
+            if (text2) { archiveText = text2; archiveOk = true; }
+          } catch(e2) {
+            console.error('羁绊档案重试失败:', e2);
+          }
+        }
 
-        notify(charName + ' 羁绊档案已生成', 'success');
-        renderBondArchive(charName, text);
+        if (archiveOk && archiveText) {
+          archiveCache[charName] = archiveText;
+          notify(charName + ' 羁绊档案已生成', 'success');
+          renderBondArchive(charName, archiveText);
+        } else {
+          throw new Error(archiveText ? '格式不符合要求' : '生成结果为空');
+        }
 
       } catch(e) {
         console.error('羁绊档案生成失败:', e);
