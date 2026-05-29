@@ -2789,6 +2789,7 @@ function renderCharsList($scroll) {
       renderList(currentTab);
     }
 
+    var archiveState = { charName: null, messageCount: 8 };
     var archiveCache = {};
 
     function showBondArchive(charName) {
