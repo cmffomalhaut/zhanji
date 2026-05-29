@@ -2295,7 +2295,7 @@ function renderCharsList($scroll) {
         var skills = charData.技能 || {};
         var html = '<div style="margin-bottom:8px;font-size:13px;color:#94a3b8;">为 <b>' + charName + '</b> 选择要替换的槽位:</div>';
         for (var i = 2; i <= 6; i++) {
-          var sk = skills['槽位_' + i];
+          var sk = skills['槽位_' + i] || skills[String(i)] || skills['技能_' + i];
           var currName = sk ? (sk.name || '未生成') : '空';
           var currRarity = sk ? (sk.稀有度 || '-') : '-';
           html += '<div class="list-item learn-slot-item" data-slot="' + i + '" style="cursor:pointer;">' +
@@ -3241,7 +3241,7 @@ function renderCharsList($scroll) {
       var hasAnySkill = Object.keys(skills).length > 0;
       for (var slotNum = 1; slotNum <= maxSlots; slotNum++) {
         var skillKey = '槽位_' + slotNum;
-        var skill = skills[skillKey];
+        var skill = skills[skillKey] || skills[String(slotNum)] || skills['技能_' + slotNum];
         if (skill) {
           var label = window.SLOT_LABELS && window.SLOT_LABELS[slotNum];
           var typeTag = getSkillTypeTag(skill.类型);
