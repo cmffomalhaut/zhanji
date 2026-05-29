@@ -1,0 +1,2942 @@
+let currentData = {};
+    let selectedCharName = null;
+    let currentView = 'list';
+    let currentTab = 'chars';
+    let collapsedCategories = {};
+    let collapsedSections = {};
+
+    let pendingPurchase = null;
+let warehouseData = {};
+    let senkiWarehouseData = {};
+    let pendingWhAction = null;
+    let pendingDestroyAction = null;
+    let pendingDeleteQuestId = null;
+
+var DAILY_QUEST_POOL = [
+      { name:'实战训练', req:'在虚拟训练平台进行1次战斗', 金币:[80,150], 道具:[{n:'小型经验糖果',q:1}], 标签:['战斗'], icon:'⚔️' },
+      { name:'基础训练', req:'与任意野生战姬投影体进行1场战斗', 金币:[80,120], 道具:[{n:'初级伤药',q:1}], 标签:['战斗'], icon:'⚔️' },
+      { name:'连胜挑战', req:'在战斗中取得1次胜利', 金币:[100,150], 道具:[{n:'小型经验糖果',q:1}], 标签:['战斗'], icon:'🏆' },
+      { name:'城市巡游', req:'前往2个不同地点', 金币:[50,100], 道具:[{n:'初级伤药',q:1}], 标签:['探索'], icon:'🗺️' },
+      { name:'信息收集', req:'前往人员密集场所探查情报', 金币:[50,100], 道具:[{n:'小型经验糖果',q:1}], 标签:['探索'], icon:'🔍' },
+      { name:'社交拜访', req:'与1位NPC进行对话互动', 金币:[30,80], 道具:[{n:'迷魂香',q:1}], 标签:['探索'], icon:'💬' },
+      { name:'战姬互动', req:'与任意出战战姬进行1次H互动', 金币:[100,200], 道具:[{n:'甜蜜糖果',q:1}], 标签:['养成'], icon:'💕' },
+      { name:'好感培养', req:'通过互动提升任意战姬好感度至少3点', 金币:[80,120], 道具:[{n:'甜蜜糖果',q:1}], 标签:['养成'], icon:'💝' },
+      { name:'亲密接触', req:'与任意战姬进行亲密身体接触', 金币:[50,100], 道具:[{n:'小型经验糖果',q:1}], 标签:['养成'], icon:'🤝' },
+      { name:'经验积累', req:'使用经验糖果提升任意战姬经验', 金币:[50,80], 道具:[{n:'中型经验糖果',q:1}], 标签:['养成'], icon:'⭐' },
+      { name:'技能试炼', req:'在战斗中使用1次战姬技能', 金币:[80,120], 道具:[{n:'技能强化剂',q:1}], 标签:['战斗'], icon:'⚡' },
+      { name:'道具使用', req:'使用1个任意道具', 金币:[30,60], 道具:[{n:'初级伤药',q:1}], 标签:['探索'], icon:'🧪' },
+      { name:'装备整理', req:'检查并调整1位战姬的着装', 金币:[30,60], 道具:[{n:'迷魂香',q:1}], 标签:['养成'], icon:'👗' },
+      { name:'切磋交流', req:'与1位其他训练家进行战斗', 金币:[100,150], 道具:[{n:'普通捕捉球',q:1}], 标签:['战斗'], icon:'🤺' },
+      { name:'野外探索', req:'前往野外区域进行探索', 金币:[50,100], 道具:[{n:'小型经验糖果',q:1}], 标签:['探索'], icon:'🌲' },
+      { name:'据点打理', req:'维护据点设施（检查收藏室或工作区）', 金币:[50,100], 道具:[{n:'小型经验糖果',q:1}], 标签:['探索'], icon:'🏰' },
+      { name:'情报收集', req:'打探当地奇怪事情的情报', 金币:[30,60], 道具:[{n:'初级伤药',q:1}], 标签:['探索'], icon:'📋' },
+      { name:'日常巡逻', req:'在当前区域巡逻一次', 金币:[50,80], 道具:[{n:'初级伤药',q:1}], 标签:['探索'], icon:'🚶' },
+    ];
+
+    var WEEKLY_QUEST_POOL = [
+      { name:'连战连胜', req:'本周内取得3场战斗胜利', 金币:[300,500], 道具:[{n:'高级伤药',q:1},{n:'中型经验糖果',q:2}], 标签:['战斗'], icon:'⚔️' },
+      { name:'精英讨伐', req:'击败1名拥有C级以上战姬的训练家', 金币:[400,600], 道具:[{n:'大型经验糖果',q:1}], 标签:['战斗'], icon:'💀' },
+      { name:'战姬捕获', req:'使用捕捉球成功捕获1只野生战姬', 金币:[300,500], 道具:[{n:'高级捕捉球',q:2}], 标签:['捕获'], icon:'🎯' },
+      { name:'稀有猎手', req:'捕获1只C级或以上品质的战姬', 金币:[500,800], 道具:[{n:'超级捕捉球',q:1}], 标签:['捕获'], icon:'💎' },
+      { name:'战姬培养', req:'让任意战姬升3级', 金币:[300,500], 道具:[{n:'大型经验糖果',q:2}], 标签:['养成'], icon:'📈' },
+      { name:'好感突破', req:'将任意战姬好感度提升至80以上', 金币:[400,600], 道具:[{n:'挚爱糖果',q:1}], 标签:['养成'], icon:'💕' },
+      { name:'技能掌握', req:'让任意战姬学会1个新技能', 金币:[500,700], 道具:[{n:'稀有技能学习机',q:1}], 标签:['养成'], icon:'📚' },
+      { name:'据点建设', req:'升级1次据点设施（收藏室或工作区）', 金币:[400,600], 道具:[{n:'高级融合催化剂',q:1}], 标签:['养成'], icon:'🏗️' },
+      { name:'融合实验', req:'尝试进行1次战姬融合', 金币:[500,700], 道具:[{n:'高级融合保护剂',q:1}], 标签:['融合'], icon:'🔮' },
+      { name:'秘境探索', req:'探索1处秘境', 金币:[500,800], 道具:[{n:'高级相性提升剂',q:1}], 标签:['秘境'], icon:'🌌' },
+      { name:'打工赚钱', req:'让战姬在工作区服役', 金币:[200,400], 道具:[{n:'中级经验糖果',q:3}], 标签:['养成'], icon:'💰' },
+      { name:'社交达人', req:'与3位不同NPC建立良好关系', 金币:[300,500], 道具:[{n:'甜蜜糖果',q:3}], 标签:['探索'], icon:'🤝' },
+      { name:'收藏扩充', req:'增加收藏室中的战姬', 金币:[300,500], 道具:[{n:'大型经验糖果',q:1}], 标签:['养成'], icon:'📦' },
+      { name:'竞技挑战', req:'参加1场正式的训练家对战', 金币:[400,600], 道具:[{n:'技能强化剂',q:2}], 标签:['战斗'], icon:'🏟️' },
+      { name:'探险远征', req:'前往1个新的城镇或特殊地点', 金币:[300,500], 道具:[{n:'高级捕捉球',q:1}], 标签:['探索'], icon:'🧭' },
+    ];
+
+    function randomInRange(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+    function randomPick(arr, n) {
+      var shuffled = arr.slice().sort(function() { return Math.random() - 0.5; });
+      return shuffled.slice(0, n);
+    }
+
+    function pickQuests(pool, count, existingNames) {
+      var candidates = pool.filter(function(q) { return existingNames.indexOf(q.name) < 0; });
+      if (candidates.length < count) candidates = pool.filter(function(q) { return existingNames.indexOf(q.name) < 0; });
+      if (candidates.length === 0) return [];
+      if (candidates.length <= count) return randomPick(candidates, candidates.length);
+      return randomPick(candidates, count);
+    }
+
+    function buildTask(tmpl, type, dateStr) {
+      var goldReward = randomInRange(tmpl.金币[0], tmpl.金币[1]);
+      var itemStrs = tmpl.道具.map(function(it) { return it.n + '×' + it.q; });
+      var rewardStr = '🪙金币×' + goldReward + (itemStrs.length > 0 ? ', ' + itemStrs.join(', ') : '');
+      var deadline = type === '日常任务' ? '当天' : '本周日';
+      return {
+        名称: tmpl.name, 要求: tmpl.req, 奖励: rewardStr, 类型: type,
+        期限: deadline, 已完成: false, 已过期: false, 进度: '0/1',
+        标签: tmpl.标签 || [], 图标: tmpl.icon || '📋', 发布者: '任务公会', 背景色: ''
+      };
+    }
+
+    async function refreshQuests(type) {
+      if (typeof updateVariablesWith !== 'function') { notify('变量更新不可用', 'error'); return false; }
+      if (getCurrentMessageId() !== getLastMessageId()) { notify('请在最新楼层操作', 'warning'); return false; }
+      var result = await updateVariablesWith(function(variables) {
+        var sd = _.get(variables, 'stat_data', {});
+        var currentDate = _.get(sd, '世界.日期', '');
+        var tasks = _.get(sd, '任务列表', {});
+        var rewardMap = _.get(sd, '_任务奖励映射', {});
+        var pool = type === '日常任务' ? DAILY_QUEST_POOL : WEEKLY_QUEST_POOL;
+        var prefix = type === '日常任务' ? '日常' : '周常';
+        var currentCount = 0;
+        for (var tid in tasks) {
+          if (tasks[tid] && tasks[tid].类型 === type && !tasks[tid].已完成) {
+            currentCount++;
+          }
+        }
+        var need = 3 - currentCount;
+        if (need <= 0) return variables;
+        var maxIdx = 0;
+        for (var existingId in tasks) {
+          if (existingId.startsWith(prefix + '_')) {
+            var parts = existingId.split('_');
+            var idx = parseInt(parts[parts.length - 1], 10);
+            if (!isNaN(idx) && idx > maxIdx) maxIdx = idx;
+          }
+        }
+        var existingNames = Object.values(tasks).map(function(t) { return t.名称; });
+        var selected = pickQuests(pool, need, existingNames);
+        for (var i = 0; i < selected.length; i++) {
+          var tmpl = selected[i];
+          var taskId = prefix + '_' + currentDate + '_' + (maxIdx + i + 1);
+          var task = buildTask(tmpl, type, currentDate);
+          tasks[taskId] = task;
+          rewardMap[taskId] = {
+            _type: type,
+            金币: randomInRange(tmpl.金币[0], tmpl.金币[1]),
+            道具: tmpl.道具.map(function(it) { return { 名称: it.n, 数量: it.q }; }),
+            经验值: randomInRange(200, 600)
+          };
+        }
+        _.set(variables, 'stat_data.任务列表', tasks);
+        _.set(variables, 'stat_data._任务奖励映射', rewardMap);
+        return variables;
+      }, { type: 'message' });
+      return !!result;
+    }
+
+    const SHOP_ITEMS = [
+      { category:'捕捉类', name:'普通捕捉球', desc:'捕捉E/D级战姬', price:100 },
+      { category:'捕捉类', name:'高级捕捉球', desc:'捕捉C级以下战姬', price:500 },
+      { category:'捕捉类', name:'超级捕捉球', desc:'B级以下高成功率，A级低成功率', price:5000, limit:'每周限购1' },
+      { category:'捕捉类', name:'魅惑之球', desc:'大幅降低抵抗意志，对任何品质有效', price:20000, limit:'极稀有' },
+      { category:'战斗类', name:'初级伤药', desc:'恢复20%HP', price:50 },
+      { category:'战斗类', name:'中级伤药', desc:'恢复50%HP', price:200 },
+      { category:'战斗类', name:'高级伤药', desc:'恢复80%HP', price:500 },
+      { category:'战斗类', name:'完全伤药', desc:'恢复100%HP', price:1000, limit:'每周限购3' },
+      { category:'战斗类', name:'沉睡之心', desc:'恢复50%HP+消除负面状态，沉睡12小时', price:100, limit:'每周限购2' },
+      { category:'战斗类', name:'解毒药', desc:'解除中毒状态', price:30 },
+      { category:'战斗类', name:'灼伤药', desc:'解除灼伤状态', price:30 },
+      { category:'战斗类', name:'麻痹药', desc:'解除麻痹状态', price:30 },
+      { category:'战斗类', name:'冰冻药', desc:'解除冰冻状态', price:30 },
+      { category:'战斗类', name:'混乱药', desc:'解除混乱状态', price:30 },
+      { category:'战斗类', name:'万能药', desc:'解除所有异常状态', price:200 },
+      { category:'战斗类', name:'技能强化剂', desc:'下一个技能威力+20%', price:150 },
+      { category:'属性精华', name:'地之精华', desc:'地属性战姬攻击力+10%，持续3回合', price:100 },
+      { category:'属性精华', name:'水之精华', desc:'水属性战姬攻击力+10%，持续3回合', price:100 },
+      { category:'属性精华', name:'火之精华', desc:'火属性战姬攻击力+10%，持续3回合', price:100 },
+      { category:'属性精华', name:'风之精华', desc:'风属性战姬攻击力+10%，持续3回合', price:100 },
+      { category:'属性精华', name:'光之精华', desc:'光属性战姬攻击力+10%，持续3回合', price:100 },
+      { category:'属性精华', name:'暗之精华', desc:'暗属性战姬攻击力+10%，持续3回合', price:100 },
+      { category:'养成类', name:'小型经验糖果', desc:'+100经验值', price:50 },
+      { category:'养成类', name:'中型经验糖果', desc:'+300经验值', price:120 },
+      { category:'养成类', name:'大型经验糖果', desc:'+1000经验值', price:200 },
+      { category:'养成类', name:'甜蜜糖果', desc:'好感度+5~10（上限80）', price:100 },
+      { category:'养成类', name:'挚爱糖果', desc:'好感度+30~50（上限80）', price:800 },
+      { category:'融合类', name:'初级融合保护剂', desc:'融合失败时50%几率保护主体', price:500 },
+      { category:'融合类', name:'高级融合保护剂', desc:'融合失败时80%几率保护主体', price:2000 },
+      { category:'融合类', name:'完全融合保护剂', desc:'融合失败时必定保护主体', price:5000, limit:'每周限购1' },
+      { category:'融合类', name:'初级融合催化剂', desc:'融合成功率+5%', price:300 },
+      { category:'融合类', name:'高级融合催化剂', desc:'融合成功率+15%', price:1000 },
+      { category:'融合类', name:'初级相性提升剂', desc:'小幅提升相性等级', price:200 },
+      { category:'融合类', name:'高级相性提升剂', desc:'大幅提升相性等级', price:800 },
+      { category:'特殊类', name:'普通技能学习机', desc:'学会一个普通品质技能（随机）', price:500 },
+      { category:'特殊类', name:'稀有技能学习机', desc:'学会一个稀有品质技能（随机）', price:2000 },
+      { category:'特殊类', name:'史诗技能学习机', desc:'学会一个史诗品质技能（随机）', price:5000, limit:'每周限购3' },
+      { category:'特殊类', name:'传说技能学习机', desc:'学会一个传说品质技能（随机）', price:20000, limit:'极稀有' },
+      { category:'特殊类', name:'指定技能学习机', desc:'学会一个指定技能', price:0, limit:'非卖品' },
+      { category:'特殊类', name:'品质提升石', desc:'A级→S级，觉醒S级专属技能', price:0, limit:'非卖品' },
+      { category:'特殊类', name:'迷魂香', desc:'降低女性抵抗意志，持续10分钟', price:200 }
+    ];
+
+    const ITEM_DESC_MAP = {
+      '普通捕捉球': '捕捉E级和D级战姬的常规捕捉球，成功率较低但价格便宜',
+      '高级捕捉球': '捕捉C级以下战姬有较高成功率的捕捉球，日常冒险必备',
+      '超级捕捉球': '对B级以下战姬有高成功率，对A级战姬也有一定概率，每周限购1个',
+      '魅惑之球': '极稀有的特殊捕捉球，大幅降低女性战姬的抵抗意志，对任何品质战姬均有效',
+      '初级伤药': '恢复战姬20%最大HP的基础回复药水',
+      '中级伤药': '恢复战姬50%最大HP的标准回复药水',
+      '高级伤药': '恢复战姬80%最大HP的高级回复药水',
+      '完全伤药': '恢复战姬100%最大HP的顶级回复药水，每周限购3个',
+      '沉睡之心': '缓慢恢复50%HP并消除所有负面状态，代价是陷入12小时沉睡无法行动，每周限购2个',
+      '解毒药': '解除战姬的中毒异常状态',
+      '灼伤药': '解除战姬的灼伤异常状态',
+      '麻痹药': '解除战姬的麻痹异常状态',
+      '冰冻药': '解除战姬的冰冻异常状态',
+      '混乱药': '解除战姬的混乱异常状态',
+      '万能药': '解除战姬所有异常状态的万能药品',
+      '技能强化剂': '临时提升下一个使用技能的威力20%，战斗中单次生效',
+      '地之精华': '地属性战姬攻击力+10%，持续3回合',
+      '水之精华': '水属性战姬攻击力+10%，持续3回合',
+      '火之精华': '火属性战姬攻击力+10%，持续3回合',
+      '风之精华': '风属性战姬攻击力+10%，持续3回合',
+      '光之精华': '光属性战姬攻击力+10%，持续3回合',
+      '暗之精华': '暗属性战姬攻击力+10%，持续3回合',
+      '小型经验糖果': '使用后获得100点经验值，适合低等级战姬快速成长',
+      '中型经验糖果': '使用后获得300点经验值，性价比适中的经验道具',
+      '大型经验糖果': '使用后获得1000点经验值，高等级战姬升级的快捷途径',
+      '甜蜜糖果': '使用后好感度+5~10点（上限80），甜蜜的心意',
+      '挚爱糖果': '使用后好感度+30~50点（上限80），表达深厚情意的珍贵糖果',
+      '初级融合保护剂': '战姬融合失败时50%几率保护主体不被消耗，基础保险',
+      '高级融合保护剂': '战姬融合失败时80%几率保护主体不被消耗，可靠保障',
+      '完全融合保护剂': '战姬融合失败时必定保护主体不被消耗，最安全的保险，每周限购1个',
+      '初级融合催化剂': '提升战姬融合成功率5%，初级催化材料',
+      '高级融合催化剂': '提升战姬融合成功率15%，高级催化材料',
+      '初级相性提升剂': '小幅提升两只战姬之间的相性等级',
+      '高级相性提升剂': '大幅提升两只战姬之间的相性等级',
+      '普通技能学习机': '使用后随机学会一个普通品质的技能',
+      '稀有技能学习机': '使用后随机学会一个稀有品质的技能',
+      '史诗技能学习机': '使用后随机学会一个史诗品质的技能，每周限购3个',
+      '传说技能学习机': '使用后随机学会一个传说品质的技能，极为稀有',
+      '指定技能学习机': '使用后可从技能列表中指定学会一个技能，非卖品',
+      '品质提升石': '将A级战姬提升至S级，并觉醒S级专属技能，优化外貌，非卖品',
+      '迷魂香': '使用后降低女性战姬的抵抗意志，效果持续10分钟'
+    };
+
+
+    function populateCharacterData() {
+  const all_vars = getAllVariables();
+  const statData = _.get(all_vars, 'stat_data', null);
+
+  if (!statData) {
+    console.warn('stat_data 不存在');
+    return;
+  }
+
+  currentData = statData;
+       // ✅ 优化玩家名获取，使用多种方式兜底
+  let playerName = _.get(currentData, '玩家名', '');
+  if (!playerName || playerName.trim() === '') {
+    playerName = (window.parent && window.parent.name1) ? window.parent.name1 : (window.name1 || '');
+  }
+  if (!playerName || playerName.trim() === '') {
+    playerName = 'lin'; // 最后兜底
+  }
+  currentData.玩家名 = playerName.trim();
+
+  const world = _.get(currentData, '世界', {});
+  const dateStr = _.get(world, '日期', '2022年5月8日');
+  const weekStr = _.get(world, '星期', '周日');
+  const timeStr = _.get(world, '时间', '08:00');
+  const goldVal = _.get(currentData, '金币', 0);
+
+  $('#top-date').text(`📅${dateStr} ${weekStr}`);
+  $('#top-time').text(`⏰${timeStr}`);
+  $('#top-gold').text(goldVal);
+
+  loadWarehouseData();
+  loadSenkiWarehouseData();
+  renderCurrentTab();
+}
+
+    function renderCurrentTab() {
+      if (currentView === 'senki-wh') {
+        loadSenkiWarehouseData();
+        renderSenkiWarehousePanel($('#panel-senki-warehouse .list-scroll'));
+        return;
+      }
+      if (currentView === 'list') {
+        renderList(currentTab);
+      } else if (currentView === 'detail' && selectedCharName) {
+        if (currentTab === 'chars' || currentTab === 'trainer') {
+          renderCharDetail(selectedCharName);
+        } else if (currentTab === 'bag') {
+          renderBagDetail(selectedCharName);
+        } else if (currentTab === 'quest') {
+          renderQuestDetail(selectedCharName);
+        }
+      }
+    }
+
+    function renderList(type) {
+      const $panel = $(`#panel-${type}`);
+      const $scroll = $panel.find('.list-scroll');
+      $scroll.empty();
+
+      if (type === 'chars') {
+        renderCharsList($scroll);
+      } else if (type === 'trainer') {
+        renderTrainerPanel($scroll);
+      } else if (type === 'bag') {
+        renderBagList($scroll);
+      } else if (type === 'quest') {
+        renderQuestList($scroll);
+      } else if (type === 'shop') {
+        renderShopList($scroll);
+      } else if (type === 'warehouse') {
+        loadWarehouseData();
+        renderWarehousePanel($scroll);
+      }
+    }
+
+    /* ✅ 修复后的战姬列表 - 已删除敌对战姬分类，解除6人限制 */
+function renderCharsList($scroll) {
+  const chars = _.get(currentData, '角色数据', {});
+  const playerName = _.get(currentData, '玩家名', '').trim();
+
+  console.log(`[DEBUG] 玩家名: "${playerName}"`); // 调试日志
+
+  const collectionRoom = _.get(currentData, '训练家.据点.收藏室', {});
+  const inCollectionFacility = _.get(collectionRoom, '当前使用', []);
+
+  const workArea = _.get(currentData, '训练家.据点.工作区', {});
+  const inWork = _.get(workArea, '当前使用', []);
+
+  const battleChars = [];
+
+  Object.entries(chars).forEach(([name, d]) => {
+    console.log(`[DEBUG] 检查战姬: ${name}, 归属状态: ${d.归属状态}, 从属训练家: "${d.从属训练家}"`); // 调试日志
+
+    if (d.归属状态 === '离场') return;
+    if (d.归属状态 === '已储存') return;
+
+    // ✅ 放宽判断条件：只要归属状态是"出战"就显示
+    if (d.归属状态 === '出战') {
+      const owner = (d.从属训练家 || '').trim();
+      // 只有明确隶属于其他人的战姬才排除，空字符串或等于玩家名的都显示
+      const isOtherOwner = owner !== '' && owner !== playerName;
+
+      if (!isOtherOwner) {
+        const inFacility = inCollectionFacility.includes(name) || inWork.includes(name);
+        battleChars.push({ name, data: d, inFacility });
+        console.log(`[DEBUG] ✅ 添加战姬: ${name}`); // 调试日志
+      } else {
+        console.log(`[DEBUG] ❌ 排除战姬: ${name} (隶属于: ${owner})`); // 调试日志
+      }
+    }
+  });
+
+  console.log(`[DEBUG] 最终战姬数量: ${battleChars.length}`); // 调试日志
+
+  if (battleChars.length === 0) {
+    $scroll.html('<div class="list-empty">👾 暂无战姬</div>');
+    return;
+  }
+
+  let html = '';
+
+  html += `<div class="category-header" data-category="battle">
+    <span>👊 出战队伍 (${battleChars.length})</span>
+    <span class="toggle-icon">▼</span>
+  </div>`;
+  html += `<div class="category-content" id="cat-battle">`;
+
+  battleChars.forEach(({ name, data: d, inFacility: inF }) => {
+    const form = d.变化形态 && d.变化形态 !== '无' ? '✨' : '';
+    const quality = d.品质 || 'E';
+    const level = d.等级 || 1;
+    const relation = _.get(d, '个人资料.与训练家关系', '');
+    let locTag = '<span class="location-tag loc-team">👊</span>';
+    if (inF) locTag = '<span class="location-tag loc-facility">🏠</span>';
+
+    html += `
+      <div class="list-item" data-name="${name}" data-type="char">
+        <div class="item-left">
+          <div class="item-name">${locTag} ${name} ${form}</div>
+          <div class="item-sub">${d.元素属性 || '无'}属性 · ${d.战斗类型 || '均衡型'}</div>
+          ${relation ? `<div class="item-identity">💕 ${relation}</div>` : ''}
+        </div>
+        <div class="item-right">${quality}级 Lv.${level}</div>
+      </div>
+    `;
+  });
+
+  html += `</div>`;
+
+  $scroll.html(html);
+
+  Object.keys(collapsedCategories).forEach(category => {
+    if (collapsedCategories[category]) {
+      $(`.category-header[data-category="${category}"]`).addClass('collapsed');
+      $(`#cat-${category}`).addClass('collapsed');
+    }
+  });
+}
+
+    /* 训练家面板 - 收藏室从角色数据筛选 */
+    function renderTrainerPanel($scroll) {
+      const trainer = _.get(currentData, '训练家', {});
+      const playerName = (_.get(currentData, '玩家名', 'lin') || '').trim();
+      const exp = _.get(trainer, '经验值', {});
+      const expPct = exp.升级所需值 ? Math.min(100, (exp.当前值 / exp.升级所需值) * 100) : 0;
+      const skills = _.get(trainer, '技能', {});
+      const equipments = _.get(trainer, '特殊装备', []);
+      const base = _.get(trainer, '据点', {});
+      const isUnlocked = _.get(base, '已解锁', false);
+      const chars = _.get(currentData, '角色数据', {});
+
+      let html = '';
+
+      html += `
+        <div class="bar-group">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <div>
+              <div style="font-size:16px;font-weight:bold;color:#f1f5f9;">👤 ${playerName}</div>
+              <div style="font-size:11px;color:#94a3b8;">${trainer.身份 || '训练家'}</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:16px;font-weight:bold;color:#a78bfa;">Lv.${trainer.等级 || 1}</div>
+            </div>
+          </div>
+          <div class="bar-row">
+            <span class="bar-icon">⭐</span>
+            <div class="bar-track"><div class="bar-fill fill-trainer" style="width:${expPct}%"></div></div>
+            <span class="bar-text">${exp.当前值 || 0}/${exp.升级所需值 || 100}</span>
+          </div>
+        </div>
+      `;
+
+      var whCount = 0;
+      try { var whKeys = Object.keys(warehouseData); whCount = whKeys.reduce(function(sum, k) { return sum + (warehouseData[k].数量 || 0); }, 0); } catch(e) { whCount = 0; }
+      var bpCount = 0;
+      try { var bpKeys = Object.keys(_.get(currentData, '背包', {})); bpCount = bpKeys.reduce(function(sum, k) { return sum + (_.get(currentData, '背包.' + k + '.数量', 0) || 0); }, 0); } catch(e) { bpCount = 0; }
+      html += `
+        <div class="warehouse-entry" id="btn-warehouse">
+          <div>
+            <div style="font-size:15px;font-weight:bold;color:#f59e0b;">📦 道具仓库</div>
+            <div style="font-size:10px;color:#94a3b8;margin-top:2px;">仓库: ${whCount}件 | 背包: ${bpCount}件 · 点击管理</div>
+          </div>
+          <div style="font-size:18px;color:#f59e0b;">→</div>
+        </div>
+      `;
+
+      var swhCount = 0;
+      try { swhCount = Object.keys(senkiWarehouseData).length; } catch(e) { swhCount = 0; }
+      var battleCount = 0;
+      try { battleCount = Object.values(_.get(currentData, '角色数据', {})).filter(function(c) { return c.归属状态 === '出战'; }).length; } catch(e) { battleCount = 0; }
+      var collectionCount = _.get(base, '收藏室.当前使用', []).length || 0;
+      var workCount = _.get(base, '工作区.当前使用', []).length || 0;
+      html += `
+        <div class="warehouse-entry" id="btn-senki-warehouse" style="background:linear-gradient(135deg, rgba(99,102,241,0.15), rgba(79,70,229,0.08));border-color:rgba(99,102,241,0.3);">
+          <div>
+            <div style="font-size:15px;font-weight:bold;color:#a5b4fc;">🏰 战姬仓库</div>
+            <div style="font-size:10px;color:#94a3b8;margin-top:2px;">仓库: ${swhCount}只 | 出战: ${battleCount}只 · 收藏室${collectionCount} · 工作区${workCount}</div>
+          </div>
+          <div style="font-size:18px;color:#a5b4fc;">→</div>
+        </div>
+      `;
+
+      html += `
+        <div class="section">
+          <div class="section-head" data-section="equips"><span>💎 特殊装备 (最多3个)</span><span class="toggle-icon">▼</span></div>
+          <div class="section-body" id="body-equips">
+      `;
+      if (equipments.length === 0) {
+        html += `<div style="color:#64748b;font-size:11px;padding:6px;">未装备特殊装备</div>`;
+      } else {
+        equipments.forEach(eq => {
+          html += `
+            <div class="special-item-card">
+              <div class="special-item-header">
+                <div class="special-item-name">💎 ${eq.名称 || '未知'}</div>
+                ${getRarityTag(eq.稀有度)}
+              </div>
+              <div class="special-item-effect">📝 ${eq.描述 || '无描述'}</div>
+              <div class="special-item-effect" style="color:#34d399;margin-top:4px;">✨ ${eq.效果 || '无效果'}</div>
+            </div>
+          `;
+        });
+      }
+      html += `</div></div>`;
+
+      html += `
+        <div class="section">
+          <div class="section-head" data-section="tskills"><span>⚡ 训练家技能</span><span class="toggle-icon">▼</span></div>
+          <div class="section-body" id="body-tskills">
+      `;
+      const skillEntries = Object.entries(skills);
+      if (skillEntries.length === 0) {
+        html += `<div style="color:#64748b;font-size:11px;padding:6px;">暂无技能</div>`;
+      } else {
+        skillEntries.forEach(([name, s]) => {
+          const locked = !s.已解锁;
+          const typeTag = s.类型 === '主动' ? '<span class="skill-type-tag stt-active">⚔️</span>' : '<span class="skill-type-tag stt-passive">🛡️</span>';
+          const cd = s.冷却回合 || 0;
+          html += `
+            <div class="skill-card trainer-skill ${locked ? 'locked' : ''}">
+              <div class="skill-header">
+                <div class="skill-name">${typeTag} ${getRarityTag(s.稀有度)} ${name}</div>
+                <div class="skill-meta">
+                  ${cd > 0 ? `<span class="skill-cd">⏱️CD:${cd}</span>` : ''}
+                </div>
+              </div>
+              <div class="skill-desc">${s.描述 || '无描述'}</div>
+              ${s.效果 ? `<div class="skill-formula">💫 ${s.效果}</div>` : ''}
+              ${locked ? `<div class="skill-unlock">🔒 ${s.解锁条件 || '未知条件'}</div>` : ''}
+            </div>
+          `;
+        });
+      }
+      html += `</div></div>`;
+
+      if (!isUnlocked) {
+        html += `
+          <div class="lock-notice">
+            <div class="lock-icon">🔒</div>
+            <div class="lock-text">据点未解锁</div>
+            <div class="lock-sub">训练家等级达到 Lv.2 后解锁</div>
+            <div class="lock-sub" style="margin-top:5px;">当前等级: Lv.${trainer.等级 || 1} (还需${Math.max(0, 2 - (trainer.等级 || 1))}级)</div>
+          </div>
+        `;
+      } else {
+        html += `
+          <div class="section">
+            <div class="section-head" data-section="base"><span>🏰 据点设施</span><span class="toggle-icon">▼</span></div>
+            <div class="section-body" id="body-base">
+        `;
+
+        const collectionRoom = _.get(base, '收藏室', {});
+        const collectionLevel = _.get(collectionRoom, '等级', 0);
+        const collectionCapacity = _.get(collectionRoom, '容量上限', 0);
+        const collectionEffect = _.get(collectionRoom, '当前效果', '');
+        const collectionAffection = _.get(collectionRoom, '每日好感加成', 0);
+        const collectionUsers = _.get(collectionRoom, '当前使用', []);
+
+        /* ✅ 从收藏室名单+战姬仓库获取战姬摘要信息 */
+        var storedCharList = [];
+        collectionUsers.forEach(function(n) {
+          var whData = _.get(senkiWarehouseData, n + '.数据');
+          if (whData) {
+            storedCharList.push({ name: n, data: whData });
+          } else {
+            storedCharList.push({ name: n, data: { 品质: '?', 等级: '?' } });
+          }
+        });
+
+        html += `
+          <div class="collection-cabinet">
+            <div class="collection-header">
+              <div class="collection-name">📦 收藏室</div>
+              <span class="collection-level fl-${collectionLevel}">Lv.${collectionLevel}</span>
+            </div>
+            <div style="font-size:10px;color:#94a3b8;margin-bottom:5px;">💤 存放战姬，每日恢复30%HP/MP+${collectionAffection}好感</div>
+            ${collectionLevel > 0 ? `
+              <div class="collection-effect">✨ ${collectionEffect || '无效果'}</div>
+              <div class="collection-capacity">👥 已储存: ${storedCharList.length}/${collectionCapacity}</div>
+              ${storedCharList.length > 0 ? `
+                <div class="collection-grid">
+                  ${storedCharList.map(({ name, data: d }) => {
+                    const relation = _.get(d, '个人资料.与训练家关系', '');
+                    return `
+                      <div class="collection-slot" data-name="${name}" data-type="char">
+                        <div class="slot-name">${name}</div>
+                        <div class="slot-info">${d.品质 || 'E'}级 Lv.${d.等级 || 1} · ${d.元素属性 || '无'}属性</div>
+                        ${relation ? `<div class="slot-info" style="color:#f472b6;">💕 ${relation}</div>` : ''}
+                      </div>
+                    `;
+                  }).join('')}
+                </div>
+              ` : '<div style="font-size:10px;color:#64748b;text-align:center;padding:12px;">收藏室为空</div>'}
+            ` : '<div style="font-size:10px;color:#64748b;text-align:center;padding:12px;">未升级（等级0）</div>'}
+          </div>
+        `;
+
+        const workArea = _.get(base, '工作区', {});
+        const workIsLocked = !_.get(workArea, '已解锁', false);
+        const workLevel = _.get(workArea, '等级', 0);
+        const workName = _.get(workArea, '名称', '');
+        const workCapacity = _.get(workArea, '容量上限', 0);
+        const workEffect = _.get(workArea, '当前效果', '');
+        const workUsers = _.get(workArea, '当前使用', []);
+        const workUnlockCond = _.get(workArea, '解锁条件', '');
+
+        html += `
+          <div class="facility-card ${workIsLocked ? 'locked' : ''}">
+            <div class="facility-header">
+              <div class="facility-name">💼 工作区</div>
+              <span class="facility-level fl-${workLevel}">Lv.${workLevel}</span>
+            </div>
+            <div style="font-size:10px;color:#94a3b8;margin-bottom:5px;">💰 让战姬打工赚取金币</div>
+            ${!workIsLocked ? `
+              ${workLevel > 0 ? `
+                <div class="facility-effect">✨ ${workEffect || '无效果'}</div>
+                <div class="facility-capacity">👥 容量: ${workUsers.length}/${workCapacity}</div>
+                ${workUsers.length > 0 ? `
+                  <div class="facility-users">
+                    ${workUsers.map(u => `<span class="facility-user">${u}</span>`).join('')}
+                  </div>
+                ` : '<div  style="font-size:10px;color:#64748b;">暂无战姬</div>'}
+              ` : '<div style="font-size:10px;color:#64748b;text-align:center;padding:12px;">未升级（等级0）</div>'}
+            ` : `
+              <div class="facility-unlock">🔒 ${workUnlockCond || '未知'}</div>
+            `}
+          </div>
+        `;
+
+        html += `</div></div>`;
+      }
+
+      $scroll.html(html);
+
+      /* ✅ 恢复section折叠状态 */
+      Object.keys(collapsedSections).forEach(sectionId => {
+        if (collapsedSections[sectionId]) {
+          $(`.section-head[data-section="${sectionId}"]`).addClass('collapsed');
+          $(`#body-${sectionId}`).addClass('collapsed');
+        }
+      });
+    }
+
+    function renderBagList($scroll) {
+      const items = _.get(currentData, '背包', {});
+      const keys = Object.keys(items);
+      const isLatest = getCurrentMessageId() === getLastMessageId();
+      const disabledAttr = isLatest ? '' : ' disabled title="请在最新楼层操作"';
+      if (keys.length === 0) {
+        $scroll.html('<div class="list-empty">🎒 背包空空</div>');
+        return;
+      }
+      keys.forEach(name => {
+        const d = items[name];
+        const desc = ITEM_DESC_MAP[name] || d.描述 || '';
+        const shortDesc = desc.length > 20 ? desc.substring(0, 20) + '...' : desc;
+        $scroll.append(`
+          <div class="list-item" data-name="${name}" data-type="bag">
+            <div class="item-left">
+              <div class="item-name">📦 ${name}</div>
+              <div class="item-sub">${shortDesc}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:13px;color:#a5b4fc;font-weight:bold;">×${d.数量 || 0}</span>
+              <button class="wh-action-btn wh-destroy-btn destroy-bag-btn"${disabledAttr} data-destroy-name="${name}">销毁</button>
+            </div>
+          </div>
+        `);
+      });
+    }
+
+    function renderQuestList($scroll) {
+      const quests = _.get(currentData, '任务列表', {});
+      const keys = Object.keys(quests);
+      const isLatest = getCurrentMessageId() === getLastMessageId();
+      const disabledAttr = isLatest ? '' : ' disabled title="请在最新楼层操作"';
+      var header = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">' +
+        '<span style="font-size:14px;font-weight:bold;color:#e2e8f0;">📜 任务列表</span>' +
+        '<div style="display:flex;gap:6px;">' +
+        '<button class="wh-action-btn" id="btn-quest-refresh-daily"' + disabledAttr + ' style="background:linear-gradient(135deg,#f59e0b,#d97706);color:white;font-size:11px;">🔄 日常</button>' +
+        '<button class="wh-action-btn" id="btn-quest-refresh-weekly"' + disabledAttr + ' style="background:linear-gradient(135deg,#a78bfa,#7c3aed);color:white;font-size:11px;">📆 周常</button>' +
+        '</div></div>';
+      $scroll.html(header);
+      if (keys.length === 0) {
+        $scroll.append('<div class="list-empty">📜 暂无任务</div>');
+        return;
+      }
+      keys.forEach(key => {
+        const q = quests[key];
+        if (q.已过期) return;
+        const typeTag = getQuestTypeTag(q.类型);
+        const isCompleted = q.已完成;
+        const status = isCompleted ? '✅' : '🔥';
+        var actionBtn = '';
+        if (isCompleted) {
+          actionBtn = '<button class="wh-action-btn claim-reward-btn"' + disabledAttr + ' data-quest-id="' + key + '" style="background:linear-gradient(135deg,#22c55e,#16a34a);color:white;font-size:11px;">领取</button>';
+        } else {
+          actionBtn = '<button class="wh-action-btn wh-destroy-btn delete-quest-btn"' + disabledAttr + ' data-quest-id="' + key + '" style="font-size:11px;">删除</button>';
+        }
+        $scroll.append(`
+          <div class="list-item" data-name="${key}" data-type="quest">
+            <div class="item-left">
+              <div class="item-name">${typeTag} ${q.名称 || key}</div>
+              <div class="item-sub">${q.要求 ? q.要求.substring(0, 20) + '...' : ''}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:13px;">${status}</span>
+              ${actionBtn}
+            </div>
+          </div>
+        `);
+      });
+    }
+
+
+    function renderShopList($scroll) {
+      const gold = _.get(currentData, '金币', 0);
+      const backpack = _.get(currentData, '背包', {});
+      const itemsByCategory = {};
+      SHOP_ITEMS.forEach(item => {
+        if (!itemsByCategory[item.category]) itemsByCategory[item.category] = [];
+        itemsByCategory[item.category].push(item);
+      });
+      let html = '';
+      Object.entries(itemsByCategory).forEach(([category, items]) => {
+        html += '<div class="category-header" data-category="shop-' + category + '"><span>' + category + '</span><span class="toggle-icon">▼</span></div>';
+        html += '<div class="category-content" id="cat-shop-' + category.replace(/[^a-zA-Z一-鿿]/g,'_') + '">';
+        items.forEach(item => {
+          const owned = _.get(backpack, item.name + '.数量', 0);
+          const notForSale = item.price === 0;
+          const btnHtml = notForSale
+            ? '<span style="font-size:11px;color:#64748b;">' + (item.limit || '暂不售卖') + '</span>'
+            : '<button class="shop-buy-btn' + (item.limit ? ' limited' : '') + '" data-item="' + item.name + '" data-price="' + item.price + '">🛒 购买</button>';
+          html += '<div class="list-item"><div class="item-left"><div class="item-name">📦 ' + item.name + (owned > 0 ? '<span style="font-size:10px;color:#94a3b8;">(已有×' + owned + ')</span>' : '') + '</div><div class="item-sub">' + item.desc + (item.limit ? ' · ' + item.limit : '') + '</div></div><div style="display:flex;align-items:center;gap:8px;"><span class="shop-item-price">🪙' + item.price + '</span>' + btnHtml + '</div></div>';
+        });
+        html += '</div>';
+      });
+      $scroll.html(html);
+      $scroll.on('click', '.shop-buy-btn', function(e) {
+        e.stopPropagation();
+        showPurchaseModal($(this).data('item'), $(this).data('price'));
+      });
+      Object.keys(collapsedCategories).forEach(function(cat) {
+        if (collapsedCategories[cat]) {
+          $('.category-header[data-category="' + cat + '"]').addClass('collapsed');
+          $('#cat-' + cat).addClass('collapsed');
+        }
+      });
+    }
+
+    function showPurchaseModal(itemName, price) {
+      pendingPurchase = { name: itemName, price: price };
+      const gold = _.get(currentData, '金币', 0);
+      const item = SHOP_ITEMS.find(i => i.name === itemName);
+      $('#modal-title').text('🛒 ' + itemName);
+      $('#modal-desc').text(item ? item.desc : '');
+      $('#modal-price').html('🪙 ' + price + ' <span style="font-size:12px;color:#94a3b8;">(持有: ' + gold + ')</span>');
+      $('#modal-confirm').prop('disabled', gold < price);
+      if (gold < price) $('#modal-price').append('<div class="insufficient" style="font-size:12px;margin-top:4px;">❌ 金币不足！</div>');
+      $('#shop-modal').addClass('show');
+    }
+
+    function hidePurchaseModal() {
+      $('#shop-modal').removeClass('show');
+      pendingPurchase = null;
+    }
+
+    function notify(msg, type) {
+      if (typeof toastr !== 'undefined' && toastr[type]) toastr[type](msg);
+      else console.log('[购买] ' + msg);
+    }
+
+    async function confirmPurchase() {
+      if (!pendingPurchase) return;
+      var name = pendingPurchase.name, price = pendingPurchase.price;
+      var gold = _.get(currentData, '金币', 0);
+      if (gold < price) { notify('金币不足，无法购买！', 'warning'); hidePurchaseModal(); return; }
+      try {
+        if (typeof updateVariablesWith !== 'function') { notify('变量更新不可用，请刷新页面', 'error'); hidePurchaseModal(); return; }
+        var shopItem = SHOP_ITEMS.find(function(i) { return i.name === name; });
+        var itemDesc = shopItem ? shopItem.desc : name;
+        await updateVariablesWith(function(variables) {
+          _.set(variables, 'stat_data.金币', gold - price);
+          var oldQty = _.get(variables, 'stat_data.背包.' + name + '.数量', 0) || 0;
+          _.set(variables, 'stat_data.背包.' + name, { 描述: itemDesc, 数量: oldQty + 1 });
+          return variables;
+        }, { type: 'message' });
+        currentData.金币 = gold - price;
+        var oldQty = _.get(currentData, '背包.' + name + '.数量', 0) || 0;
+        _.set(currentData, '背包.' + name, { 描述: itemDesc, 数量: oldQty + 1 });
+        $('#top-gold').text(currentData.金币);
+        notify('成功购买 ' + name + '！', 'success');
+        renderCurrentTab();
+        hidePurchaseModal();
+      } catch (e) {
+        console.error('购买失败:', e);
+        notify('购买失败，请重试', 'error');
+        hidePurchaseModal();
+      }
+    }
+
+    function getQuestTypeTag(type) {
+      const map = {
+        '日常任务': ['qt-daily', '📅'],
+        '周常任务': ['qt-weekly', '📆'],
+        '剧情任务': ['qt-story', '📖'],
+        '限时任务': ['qt-limited', '⏰']
+      };
+      const [cls, icon] = map[type] || ['qt-daily', '📅'];
+      return `<span class="quest-tag ${cls}">${icon}</span>`;
+    }
+
+    function loadWarehouseData() {
+      try {
+        const chatVars = getVariables({ type: 'chat' });
+        warehouseData = _.get(chatVars, '道具仓库', {});
+        if (typeof warehouseData !== 'object' || warehouseData === null) warehouseData = {};
+      } catch(e) {
+        console.warn('加载仓库数据失败:', e);
+        warehouseData = {};
+      }
+    }
+
+    function saveWarehouseData() {
+      try {
+        const chatVars = getVariables({ type: 'chat' }) || {};
+        chatVars['道具仓库'] = warehouseData;
+        replaceVariables(chatVars, { type: 'chat' });
+      } catch(e) {
+        console.error('保存仓库数据失败:', e);
+        throw e;
+      }
+    }
+
+    function loadSenkiWarehouseData() {
+      try {
+        const chatVars = getVariables({ type: 'chat' });
+        senkiWarehouseData = _.get(chatVars, '战姬仓库', {});
+        if (typeof senkiWarehouseData !== 'object' || senkiWarehouseData === null) senkiWarehouseData = {};
+      } catch(e) {
+        console.warn('加载战姬仓库失败:', e);
+        senkiWarehouseData = {};
+      }
+    }
+
+    function saveSenkiWarehouseData() {
+      try {
+        const chatVars = getVariables({ type: 'chat' }) || {};
+        chatVars['战姬仓库'] = senkiWarehouseData;
+        replaceVariables(chatVars, { type: 'chat' });
+      } catch(e) {
+        console.error('保存战姬仓库失败:', e);
+        throw e;
+      }
+    }
+
+    function showWarehouse() {
+      currentTab = 'warehouse';
+      currentView = 'list';
+      selectedCharName = null;
+      $('.nav-item').removeClass('active');
+      $('#nav-trainer').addClass('active');
+      $('.list-panel').removeClass('active');
+      $('#detail-panel').removeClass('active');
+      $('#panel-warehouse').addClass('active');
+      loadWarehouseData();
+      renderWarehousePanel($('#panel-warehouse .list-scroll'));
+    }
+
+    function renderWarehousePanel($scroll) {
+      const backpack = _.get(currentData, '背包', {});
+      const whKeys = Object.keys(warehouseData);
+      const bpKeys = Object.keys(backpack);
+      const isLatest = getCurrentMessageId() === getLastMessageId();
+      const disabledAttr = isLatest ? '' : ' disabled title="请在最新楼层操作"';
+
+      let html = '';
+
+      html += '<div class="list-header" style="justify-content:flex-start;gap:8px;">' +
+        '<button class="back-btn" id="btn-wh-back">← 返回</button>' +
+        '<span>📦 道具仓库</span>' +
+        '<span style="font-size:11px;color:#94a3b8;margin-left:auto;">仓库不占AI上下文</span>' +
+        '</div>';
+
+      if (!isLatest) {
+        html += '<div style="background:rgba(234,179,8,0.15);color:#fbbf24;padding:8px 12px;border-radius:6px;font-size:12px;text-align:center;margin-bottom:8px;">⚠ 非最新楼层，存入/取出已禁用</div>';
+      }
+
+      html += '<div class="wh-header">📦 仓库中 (' + whKeys.length + '种)</div>';
+      if (whKeys.length === 0) {
+        html += '<div class="list-empty" style="padding:16px;">仓库暂无道具</div>';
+      } else {
+        whKeys.forEach(function(name) {
+          var item = warehouseData[name];
+          var qty = item.数量 || 0;
+          if (qty <= 0) return;
+          var desc = ITEM_DESC_MAP[name] || item.描述 || '';
+          var shortDesc = desc.length > 25 ? desc.substring(0, 25) + '...' : desc;
+          html += '<div class="list-item" style="cursor:default;">' +
+            '<div class="item-left">' +
+            '<div class="item-name">📦 ' + name + '</div>' +
+            '<div class="item-sub">' + shortDesc + '</div>' +
+            '</div>' +
+            '<div style="display:flex;align-items:center;gap:6px;">' +
+'<span style="font-size:13px;color:#a5b4fc;font-weight:bold;">×' + qty + '</span>' +
+             '<button class="wh-action-btn wh-withdraw-btn"' + disabledAttr + ' data-wh-name="' + name + '">取回</button>' +
+             '<button class="wh-action-btn wh-destroy-btn destroy-wh-btn"' + disabledAttr + ' data-destroy-name="' + name + '">销毁</button>' +
+             '</div></div>';
+        });
+      }
+
+      html += '<div class="wh-header">🎒 可存入 (' + bpKeys.length + '种)</div>';
+      if (bpKeys.length === 0) {
+        html += '<div class="list-empty" style="padding:16px;">背包暂无道具</div>';
+      } else {
+        bpKeys.forEach(function(name) {
+          var item = backpack[name];
+          var qty = item.数量 || 0;
+          if (qty <= 0) return;
+          var desc = ITEM_DESC_MAP[name] || item.描述 || '';
+          var shortDesc = desc.length > 25 ? desc.substring(0, 25) + '...' : desc;
+          html += '<div class="list-item" style="cursor:default;">' +
+            '<div class="item-left">' +
+            '<div class="item-name">📦 ' + name + '</div>' +
+            '<div class="item-sub">' + shortDesc + '</div>' +
+            '</div>' +
+            '<div style="display:flex;align-items:center;gap:6px;">' +
+'<span style="font-size:13px;color:#a5b4fc;font-weight:bold;">×' + qty + '</span>' +
+             '<button class="wh-action-btn wh-deposit-btn"' + disabledAttr + ' data-wh-name="' + name + '">存入</button>' +
+             '<button class="wh-action-btn wh-destroy-btn destroy-bag-wh-btn"' + disabledAttr + ' data-destroy-name="' + name + '">销毁</button>' +
+             '</div></div>';
+        });
+      }
+
+      $scroll.html(html);
+
+      $scroll.off('click.whWithdraw').on('click.whWithdraw', '.wh-withdraw-btn', function(e) {
+        e.stopPropagation();
+        var name = $(this).data('wh-name');
+        var maxQty = _.get(warehouseData, name + '.数量', 0);
+        showWarehouseModal('withdraw', name, maxQty);
+      });
+      $scroll.off('click.whDeposit').on('click.whDeposit', '.wh-deposit-btn', function(e) {
+        e.stopPropagation();
+        var name = $(this).data('wh-name');
+        var maxQty = _.get(currentData, '背包.' + name + '.数量', 0);
+        showWarehouseModal('deposit', name, maxQty);
+      });
+      $scroll.off('click.whDestroyBag').on('click.whDestroyBag', '.destroy-bag-wh-btn', function(e) {
+        e.stopPropagation();
+        var name = $(this).data('destroy-name');
+        var maxQty = _.get(currentData, '背包.' + name + '.数量', 0);
+        showDestroyModal('bag', name, maxQty);
+      });
+      $scroll.off('click.whDestroyWh').on('click.whDestroyWh', '.destroy-wh-btn', function(e) {
+        e.stopPropagation();
+        var name = $(this).data('destroy-name');
+        var maxQty = _.get(warehouseData, name + '.数量', 0);
+        showDestroyModal('warehouse', name, maxQty);
+      });
+
+      $scroll.off('click.whBack').on('click.whBack', '#btn-wh-back', function() {
+        switchTab('trainer');
+      });
+    }
+
+    function showWarehouseModal(action, name, maxQty) {
+      pendingWhAction = { action: action, name: name, maxQty: maxQty };
+      var isDeposit = action === 'deposit';
+      var title = isDeposit ? '📦 存入仓库' : '📦 从仓库取出';
+      var desc = ITEM_DESC_MAP[name] || (isDeposit ? _.get(currentData, '背包.' + name + '.描述', '') : _.get(warehouseData, name + '.描述', ''));
+      $('#wh-modal-title').text(title);
+      $('#wh-modal-desc').text(desc);
+      $('#wh-modal-qty').val(maxQty).attr('max', maxQty).attr('min', 1);
+      $('#wh-modal-max').text('/ ' + maxQty);
+      var confirmBtn = $('#wh-modal-confirm');
+      confirmBtn.text(isDeposit ? '确认存入' : '确认取出');
+      confirmBtn.removeClass('wh-deposit-btn wh-withdraw-btn');
+      confirmBtn.addClass(isDeposit ? 'wh-deposit-btn' : 'wh-withdraw-btn');
+      $('#wh-modal-confirm').prop('disabled', false);
+      $('#warehouse-modal').addClass('show');
+    }
+
+    function hideWarehouseModal() {
+      $('#warehouse-modal').removeClass('show');
+      pendingWhAction = null;
+    }
+
+    function showDestroyModal(source, name, maxQty) {
+      pendingDestroyAction = { source: source, name: name, maxQty: maxQty };
+      var desc = ITEM_DESC_MAP[name] || (source === 'bag' ? _.get(currentData, '背包.' + name + '.描述', '') : _.get(warehouseData, name + '.描述', ''));
+      var titleHtml = source === 'bag' ? '🗑️ 销毁道具' : '🗑️ 销毁仓库道具';
+      $('#destroy-modal-title').text(titleHtml);
+      $('#destroy-modal-desc').text(desc);
+      $('#destroy-modal-qty').val(maxQty).attr('max', maxQty).attr('min', 1);
+      $('#destroy-modal-max').text('/ ' + maxQty);
+      $('#destroy-modal-confirm').prop('disabled', false);
+      $('#destroy-modal').addClass('show');
+    }
+
+    function hideDestroyModal() {
+      $('#destroy-modal').removeClass('show');
+      pendingDestroyAction = null;
+    }
+
+    function showDeleteQuestModal(questId) {
+      pendingDeleteQuestId = questId;
+      var questName = _.get(currentData, '任务列表.' + questId + '.名称', questId);
+      $('#del-modal-title').text('🗑️ 删除任务');
+      $('#del-modal-desc').text('确认删除任务: ' + questName + '？');
+      $('#delete-quest-modal').addClass('show');
+    }
+
+    function hideDeleteQuestModal() {
+      $('#delete-quest-modal').removeClass('show');
+      pendingDeleteQuestId = null;
+    }
+
+    async function confirmDeleteQuest() {
+      if (!pendingDeleteQuestId) return;
+      var questId = pendingDeleteQuestId;
+      if (getCurrentMessageId() !== getLastMessageId()) { notify('请在最新楼层操作', 'warning'); hideDeleteQuestModal(); return; }
+      try {
+        if (typeof updateVariablesWith !== 'function') { notify('变量更新不可用', 'error'); hideDeleteQuestModal(); return; }
+        await updateVariablesWith(function(variables) {
+          _.unset(variables, 'stat_data.任务列表.' + questId);
+          return variables;
+        }, { type: 'message' });
+        delete currentData.任务列表[questId];
+        notify('已删除任务', 'success');
+      } catch(e) {
+        console.error('删除任务失败:', e);
+        notify('删除失败，请重试', 'error');
+      }
+      hideDeleteQuestModal();
+      renderCurrentTab();
+    }
+
+    var pendingClaimQuestId = null;
+
+    function showClaimModal(questId) {
+      pendingClaimQuestId = questId;
+      var quest = _.get(currentData, '任务列表.' + questId, {});
+      var rewardMap = _.get(currentData, '_任务奖励映射.' + questId, {});
+      var questName = quest.名称 || questId;
+      var rewardText = '';
+      if (rewardMap.解锁) {
+        rewardText += '🔓 解锁' + rewardMap.解锁;
+      }
+      if (rewardMap.金币) {
+        rewardText += (rewardText ? '\n' : '') + '🪙 金币: ' + rewardMap.金币;
+      }
+      if (rewardMap.经验值) {
+        rewardText += (rewardText ? '\n' : '') + '⭐ 经验值: ' + rewardMap.经验值;
+      }
+      if (rewardMap.道具 && rewardMap.道具.length > 0) {
+        rewardMap.道具.forEach(function(it) {
+          rewardText += '\n📦 ' + it.名称 + ' ×' + it.数量;
+        });
+      }
+      $('#claim-modal-title').text('🎁 领取奖励');
+      $('#claim-modal-desc').text('任务: ' + questName + '\n' + rewardText);
+      $('#claim-modal').addClass('show');
+    }
+
+    function hideClaimModal() {
+      $('#claim-modal').removeClass('show');
+      pendingClaimQuestId = null;
+    }
+
+    async function confirmClaimReward() {
+      if (!pendingClaimQuestId) return;
+      var questId = pendingClaimQuestId;
+      if (getCurrentMessageId() !== getLastMessageId()) { notify('请在最新楼层操作', 'warning'); hideClaimModal(); return; }
+      try {
+        if (typeof updateVariablesWith !== 'function') { notify('变量更新不可用', 'error'); hideClaimModal(); return; }
+        var rewardMap = _.get(currentData, '_任务奖励映射.' + questId, {});
+        if (!rewardMap || (!rewardMap.金币 && (!rewardMap.道具 || rewardMap.道具.length === 0) && !rewardMap.解锁 && !rewardMap.经验值)) {
+          notify('该任务无奖励信息', 'warning');
+          hideClaimModal();
+          return;
+        }
+        await updateVariablesWith(function(variables) {
+          var sd = _.get(variables, 'stat_data', {});
+          var rm = _.get(sd, '_任务奖励映射', {});
+          var reward = rm[questId];
+          if (reward) {
+            if (reward.金币) {
+              var oldGold = _.get(sd, '金币', 0);
+              _.set(sd, '金币', oldGold + reward.金币);
+            }
+            if (reward.经验值) {
+              var oldExp = _.get(sd, '训练家.经验值.当前值', 0);
+              _.set(sd, '训练家.经验值.当前值', oldExp + reward.经验值);
+            }
+            if (reward.道具 && reward.道具.length > 0) {
+              var bp = _.get(sd, '背包', {});
+              reward.道具.forEach(function(it) {
+                var key = it.名称;
+                var existing = bp[key];
+                if (existing) {
+                  existing.数量 = (existing.数量 || 0) + (it.数量 || 1);
+                } else {
+                  bp[key] = {
+                    描述: ITEM_DESC_MAP[key] || key,
+                    数量: it.数量 || 1
+                  };
+                }
+              });
+              _.set(sd, '背包', bp);
+            }
+            if (reward.解锁 === '工作区') {
+              _.set(sd, '训练家.据点.工作区.已解锁', true);
+            }
+            delete rm[questId];
+            _.set(sd, '_任务奖励映射', rm);
+          }
+          _.unset(sd, '任务列表.' + questId);
+          _.set(variables, 'stat_data', sd);
+          return variables;
+        }, { type: 'message' });
+        if (rewardMap.金币) {
+          var oldGold = _.get(currentData, '金币', 0);
+          currentData.金币 = oldGold + rewardMap.金币;
+        }
+        if (rewardMap.经验值) {
+          var oldExp = _.get(currentData, '训练家.经验值.当前值', 0);
+          _.set(currentData, '训练家.经验值.当前值', oldExp + rewardMap.经验值);
+        }
+        if (rewardMap.道具 && rewardMap.道具.length > 0) {
+          rewardMap.道具.forEach(function(it) {
+            var existing = currentData.背包[it.名称];
+            if (existing) {
+              existing.数量 = (existing.数量 || 0) + (it.数量 || 1);
+            } else {
+              currentData.背包[it.名称] = {
+                描述: ITEM_DESC_MAP[it.名称] || it.名称,
+                数量: it.数量 || 1
+              };
+            }
+          });
+        }
+        delete currentData.任务列表[questId];
+        delete currentData._任务奖励映射[questId];
+        if (rewardMap.解锁 === '工作区') {
+          _.set(currentData, '训练家.据点.工作区.已解锁', true);
+          notify('奖励已领取！工作区已解锁！', 'success');
+        } else {
+          notify('奖励已领取！', 'success');
+        }
+      } catch(e) {
+        console.error('领取奖励失败:', e);
+        notify('领取失败，请重试', 'error');
+      }
+      hideClaimModal();
+      renderCurrentTab();
+    }
+
+    // === 技能学习机流程 ===
+    var learnState = { itemName: null, rarity: null, step: 0, chars: [], selectedChar: null, selectedSlot: null };
+
+    function showLearnModal(itemName) {
+      var rarity = window.SKILL_LEARN_MACHINE_MAP[itemName];
+      if (!rarity) { notify('未知的学习机', 'error'); return; }
+      var chars = [];
+      _.each(currentData.角色数据, function(c, name) {
+        if (c && c.品质) chars.push(name);
+      });
+      if (chars.length === 0) { notify('没有可使用的战姬', 'warning'); return; }
+      learnState = { itemName: itemName, rarity: rarity, step: 0, chars: chars, selectedChar: null, selectedSlot: null };
+      renderLearnStep(1);
+      $('#learn-modal').addClass('show');
+    }
+
+    function hideLearnModal() {
+      $('#learn-modal').removeClass('show');
+      learnState = { itemName: null, rarity: null, step: 0, chars: [], selectedChar: null, selectedSlot: null };
+    }
+
+    function renderLearnStep(step) {
+      learnState.step = step;
+      var rarityColor = { '普通': '#94a3b8', '稀有': '#22d3ee', '史诗': '#a78bfa', '传说': '#fbbf24' };
+      var rColor = rarityColor[learnState.rarity] || '#94a3b8';
+      $('#learn-modal-title').html('🎓 技能学习机 <span style="color:' + rColor + ';font-size:12px;">[' + learnState.rarity + ']</span>');
+      var $body = $('#learn-modal-body');
+      if (step === 1) {
+        var html = '<div style="margin-bottom:8px;font-size:13px;color:#94a3b8;">选择要学习的战姬:</div>';
+        learnState.chars.forEach(function(name) {
+          var c = currentData.角色数据[name];
+          var quality = c.品质 || 'E';
+          var element = c.属性 || '无';
+          html += '<div class="list-item learn-char-item" data-char="' + name + '" style="cursor:pointer;">' +
+            '<div class="item-left"><div class="item-name">⚔️ ' + name + '</div>' +
+            '<div class="item-sub">品质' + quality + ' | ' + element + '</div></div></div>';
+        });
+        $body.html(html);
+        $('.learn-char-item').off('click').on('click', function() {
+          learnState.selectedChar = $(this).data('char');
+          renderLearnStep(2);
+        });
+      } else if (step === 2) {
+        var charName = learnState.selectedChar;
+        var charData = currentData.角色数据 && currentData.角色数据[charName];
+        if (!charData) { notify('角色数据不存在', 'error'); hideLearnModal(); return; }
+        var skills = charData.技能 || {};
+        var entries = Object.entries(skills);
+        var lSlotData = {};
+        var lUnnamed = [];
+        entries.forEach(function(_ref) {
+          var k = _ref[0], v = _ref[1];
+          var m = k.match(/^槽位_(\d+)$/);
+          if (m) { var sn = parseInt(m[1], 10); if (sn >= 2 && sn <= 6) { lSlotData[sn] = v; return; } }
+          lUnnamed.push(v);
+        });
+        var lnSlot = 2;
+        lUnnamed.forEach(function(v) {
+          while (lSlotData[lnSlot] && lnSlot <= 6) lnSlot++;
+          if (lnSlot <= 6) { lSlotData[lnSlot] = v; lnSlot++; }
+        });
+        var html = '<div style="margin-bottom:8px;font-size:13px;color:#94a3b8;">为 <b>' + charName + '</b> 选择要替换的槽位:</div>';
+        for (var i = 2; i <= 6; i++) {
+          var sk = lSlotData[i] || null;
+          var currName = sk ? (sk.name || '未生成') : '空';
+          var currRarity = sk ? (sk.稀有度 || '-') : '-';
+          html += '<div class="list-item learn-slot-item" data-slot="' + i + '" style="cursor:pointer;">' +
+            '<div class="item-left"><div class="item-name">槽位 ' + i + '</div>' +
+            '<div class="item-sub">当前: ' + currName + ' [' + currRarity + ']</div></div>' +
+            '<span style="color:' + rColor + ';font-size:12px;">→ ' + learnState.rarity + '</span></div>';
+        }
+        $body.html(html);
+        $('.learn-slot-item').off('click').on('click', function() {
+          learnState.selectedSlot = $(this).data('slot');
+          renderLearnStep(3);
+        });
+      } else if (step === 3) {
+        var charName = learnState.selectedChar;
+        var slotKey = '槽位_' + learnState.selectedSlot;
+        var oldSkill = _.get(currentData, '角色数据.' + charName + '.技能.' + slotKey, {});
+        var oldName = oldSkill.name || '空';
+        var oldRarity = oldSkill.稀有度 || '-';
+        var html = '<div style="font-size:13px;color:#e2e8f0;margin-bottom:12px;">' +
+          '确认使用 <b style="color:' + rColor + ';">' + learnState.itemName + '</b> 为 <b>' + charName + '</b> 学习技能</div>' +
+          '<div class="info-card"><div class="info-row"><span class="info-label">🎯 目标槽位</span><span class="info-value">槽位 ' + learnState.selectedSlot + '</span></div>' +
+          '<div class="info-row"><span class="info-label">⬅ 旧技能</span><span class="info-value">' + oldName + ' [' + oldRarity + ']</span></div>' +
+          '<div class="info-row"><span class="info-label">➡ 新品质</span><span class="info-value" style="color:' + rColor + ';">' + learnState.rarity + '</span></div></div>';
+        $body.html(html);
+      }
+      var $confirm = $('#learn-modal-confirm');
+      if (step < 3) {
+        $confirm.hide();
+      } else {
+        $confirm.show().text('🎓 确认学习').prop('disabled', false);
+      }
+    }
+
+    async function confirmLearnSkill() {
+      var state = learnState;
+      if (!state.itemName || !state.selectedChar || !state.selectedSlot) return;
+      if (getCurrentMessageId() !== getLastMessageId()) { notify('请在最新楼层操作', 'warning'); hideLearnModal(); return; }
+      var charName = state.selectedChar;
+      var slotIndex = state.selectedSlot;
+      var slotKey = '槽位_' + slotIndex;
+      var charData = currentData.角色数据[charName];
+      if (!charData) { notify('角色数据不存在', 'error'); hideLearnModal(); return; }
+      var $btn = $('#learn-modal-confirm');
+      $btn.prop('disabled', true).text('⏳ 生成中...');
+      try {
+        var isPassive = rollPassive(slotIndex);
+        notify('正在使用 ' + state.itemName + ' 为 ' + charName + ' 生成技能 [槽位' + slotIndex + ']' + (isPassive ? ' [被动]' : ''), 'info');
+        var skill = await generateSingleSkill(charName, charData, slotIndex, getSkillSlotCount(), isPassive, state.rarity);
+        if (!skill) {
+          notify('技能生成失败，未消耗学习机', 'error');
+          $btn.prop('disabled', false).text('🎓 确认学习');
+          return;
+        }
+        await updateVariablesWith(function(variables) {
+          var oldSkills = _.get(variables, 'stat_data.角色数据.' + charName + '.技能', {});
+          skillBackupCache[charName] = oldSkills;
+          var newSkills = {};
+          Object.keys(oldSkills).forEach(function(k) {
+            var m = k.match(/^槽位_(\d+)$/);
+            if (m && parseInt(m[1], 10) === slotIndex) return;
+            newSkills[k] = oldSkills[k];
+          });
+          var tpEntries = Object.entries(newSkills);
+          var tpSlots = {};
+          var tpNames = [];
+          tpEntries.forEach(function(e) {
+            var km = e[0].match(/^槽位_(\d+)$/);
+            if (km) { tpSlots[parseInt(km[1], 10)] = e[0]; }
+            else { tpNames.push(e[0]); }
+          });
+          var tns = 1;
+          tpNames.forEach(function(nk) {
+            while (tpSlots[tns]) tns++;
+            if (tns === slotIndex) { delete newSkills[nk]; }
+            tns++;
+          });
+          newSkills[slotKey] = skill;
+          _.set(variables, 'stat_data.角色数据.' + charName + '.技能', newSkills);
+          var bp = _.get(variables, 'stat_data.背包.' + state.itemName, {});
+          if (bp.数量) {
+            bp.数量 = (bp.数量 || 1) - 1;
+            if (bp.数量 <= 0) {
+              _.unset(variables, 'stat_data.背包.' + state.itemName);
+            } else {
+              _.set(variables, 'stat_data.背包.' + state.itemName, bp);
+            }
+          }
+          return variables;
+        }, { type: 'message' });
+        populateCharacterData();
+        learnMachineLock[charName + '_' + slotIndex] = state.rarity;
+        notify(charName + ' 槽位' + slotIndex + ' 已学习新技能 [' + (skill.name || '未知') + ']', 'success');
+        hideLearnModal();
+        renderCurrentTab();
+      } catch(e) {
+        console.error('学习机使用失败:', e);
+        notify('学习机使用失败', 'error');
+        $btn.prop('disabled', false).text('🎓 确认学习');
+      }
+    }
+
+    async function confirmDestroyAction() {
+      if (!pendingDestroyAction) return;
+      if (getCurrentMessageId() !== getLastMessageId()) { notify('请在最新楼层操作', 'warning'); hideDestroyModal(); return; }
+      var source = pendingDestroyAction.source;
+      var name = pendingDestroyAction.name;
+      var maxQty = pendingDestroyAction.maxQty;
+      var qty = parseInt($('#destroy-modal-qty').val()) || maxQty;
+      if (qty < 1) qty = 1;
+      if (qty > maxQty) qty = maxQty;
+
+      try {
+        if (typeof updateVariablesWith !== 'function') { notify('变量更新不可用，请刷新页面', 'error'); hideDestroyModal(); return; }
+
+        if (source === 'bag') {
+          var bpItem = _.get(currentData, '背包.' + name);
+          if (!bpItem || bpItem.数量 < qty) { notify('道具数量不足！', 'warning'); hideDestroyModal(); return; }
+          var remainQty = bpItem.数量 - qty;
+
+          await updateVariablesWith(function(variables) {
+            var oldQty = _.get(variables, 'stat_data.背包.' + name + '.数量', 0) || 0;
+            if (oldQty <= qty) {
+              _.unset(variables, 'stat_data.背包.' + name);
+            } else {
+              _.set(variables, 'stat_data.背包.' + name + '.数量', oldQty - qty);
+            }
+            return variables;
+          }, { type: 'message' });
+
+          if (remainQty <= 0) {
+            delete currentData.背包[name];
+          } else {
+            currentData.背包[name].数量 = remainQty;
+          }
+          notify('已销毁 ' + qty + ' 个' + name, 'success');
+
+        } else if (source === 'warehouse') {
+          var whItem = warehouseData[name];
+          if (!whItem || whItem.数量 < qty) { notify('仓库道具数量不足！', 'warning'); hideDestroyModal(); return; }
+          var whRemain = whItem.数量 - qty;
+
+          if (whRemain <= 0) {
+            delete warehouseData[name];
+          } else {
+            warehouseData[name].数量 = whRemain;
+          }
+          saveWarehouseData();
+          notify('已销毁 ' + qty + ' 个' + name, 'success');
+        }
+
+        hideDestroyModal();
+        renderCurrentTab();
+      } catch (e) {
+        console.error('销毁失败:', e);
+        notify('销毁失败，请重试', 'error');
+        hideDestroyModal();
+      }
+    }
+
+    async function confirmWarehouseAction() {
+      if (!pendingWhAction) return;
+      if (getCurrentMessageId() !== getLastMessageId()) { notify('请在最新楼层操作仓库', 'warning'); hideWarehouseModal(); return; }
+      var action = pendingWhAction.action;
+      var name = pendingWhAction.name;
+      var maxQty = pendingWhAction.maxQty;
+      var qty = parseInt($('#wh-modal-qty').val()) || maxQty;
+      if (qty < 1) qty = 1;
+      if (qty > maxQty) qty = maxQty;
+
+      try {
+        if (typeof updateVariablesWith !== 'function') { notify('变量更新不可用，请刷新页面', 'error'); hideWarehouseModal(); return; }
+
+        if (action === 'deposit') {
+          var backpack = _.get(currentData, '背包', {});
+          var bpItem = backpack[name];
+          if (!bpItem || bpItem.数量 < qty) { notify('背包中道具不足！', 'warning'); hideWarehouseModal(); return; }
+          var itemDesc = ITEM_DESC_MAP[name] || bpItem.描述 || name;
+          var newBpQty = bpItem.数量 - qty;
+
+          await updateVariablesWith(function(variables) {
+            var oldQty = _.get(variables, 'stat_data.背包.' + name + '.数量', 0) || 0;
+            if (oldQty <= qty) {
+              _.unset(variables, 'stat_data.背包.' + name);
+            } else {
+              _.set(variables, 'stat_data.背包.' + name + '.数量', oldQty - qty);
+            }
+            return variables;
+          }, { type: 'message' });
+
+          if (warehouseData[name]) {
+            warehouseData[name].数量 += qty;
+          } else {
+            warehouseData[name] = { 描述: itemDesc, 数量: qty };
+          }
+
+          if (newBpQty <= 0) {
+            delete currentData.背包[name];
+          } else {
+            currentData.背包[name].数量 = newBpQty;
+          }
+          saveWarehouseData();
+          notify('成功存入 ' + qty + ' 个' + name, 'success');
+
+        } else if (action === 'withdraw') {
+          var whItem = warehouseData[name];
+          if (!whItem || whItem.数量 < qty) { notify('仓库中道具不足！', 'warning'); hideWarehouseModal(); return; }
+          var whDesc = whItem.描述 || ITEM_DESC_MAP[name] || name;
+          var newWhQty = whItem.数量 - qty;
+
+          await updateVariablesWith(function(variables) {
+            var oldQty = _.get(variables, 'stat_data.背包.' + name + '.数量', 0) || 0;
+            _.set(variables, 'stat_data.背包.' + name, { 描述: whDesc, 数量: oldQty + qty });
+            return variables;
+          }, { type: 'message' });
+
+          if (newWhQty <= 0) {
+            delete warehouseData[name];
+          } else {
+            warehouseData[name].数量 = newWhQty;
+          }
+
+          var existingItem = currentData.背包[name];
+          if (existingItem) {
+            existingItem.数量 += qty;
+          } else {
+            currentData.背包[name] = { 描述: whDesc, 数量: qty };
+          }
+          saveWarehouseData();
+          notify('成功取出 ' + qty + ' 个' + name, 'success');
+        }
+
+        hideWarehouseModal();
+        loadWarehouseData();
+        renderCurrentTab();
+        if (currentTab === 'warehouse') {
+          renderWarehousePanel($('#panel-warehouse .list-scroll'));
+        }
+      } catch (e) {
+        console.error('仓库操作失败:', e);
+        notify('操作失败，请重试', 'error');
+        hideWarehouseModal();
+      }
+    }
+
+    // ========== 战姬仓库 ==========
+
+    function getSenkiFacBadge(pos) {
+      var map = { '收藏室': ['sfb-collection', '📦收藏室'], '工作区': ['sfb-work', '💼工作区'], '仓库': ['sfb-none', '📋仓库'] };
+      var info = map[pos] || ['sfb-none', '📋' + (pos || '无')];
+      return '<span class="senki-fac-badge ' + info[0] + '">' + info[1] + '</span>';
+    }
+
+    function showSenkiWarehouse() {
+      currentView = 'senki-wh';
+      selectedCharName = null;
+      $('.nav-item').removeClass('active');
+      $('#nav-trainer').addClass('active');
+      $('.list-panel').removeClass('active');
+      $('#detail-panel').removeClass('active');
+      $('#panel-senki-warehouse').addClass('active');
+      loadSenkiWarehouseData();
+      renderSenkiWarehousePanel($('#panel-senki-warehouse .list-scroll'));
+    }
+
+    function renderSenkiWarehousePanel($scroll) {
+      var isLatest = getCurrentMessageId() === getLastMessageId();
+      var disabledAttr = isLatest ? '' : ' disabled title="请在最新楼层操作"';
+      var whNames = Object.keys(senkiWarehouseData);
+      var chars = _.get(currentData, '角色数据', {});
+      var collectionRoom = _.get(currentData, '训练家.据点.收藏室', {});
+      var workArea = _.get(currentData, '训练家.据点.工作区', {});
+
+      var html = '';
+      html += '<div class="list-header" style="justify-content:flex-start;gap:8px;">' +
+        '<button class="back-btn" id="btn-swh-back">← 返回</button>' +
+        '<span>🏰 战姬仓库</span>' +
+        '<span style="font-size:11px;color:#94a3b8;margin-left:auto;">仓库不占AI上下文</span>' +
+        '</div>';
+
+      if (!isLatest) {
+        html += '<div style="background:rgba(234,179,8,0.15);color:#fbbf24;padding:8px 12px;border-radius:6px;font-size:12px;text-align:center;margin-bottom:8px;">⚠ 非最新楼层，存取已禁用</div>';
+      }
+
+      html += '<div class="wh-header">🏰 仓库中 (' + whNames.length + '只)</div>';
+      if (whNames.length === 0) {
+        html += '<div class="list-empty" style="padding:16px;">仓库暂无战姬</div>';
+      } else {
+        whNames.forEach(function(name) {
+          var stored = senkiWarehouseData[name];
+          var charData = stored.数据 || {};
+          var pos = stored.位置 || '仓库';
+          var quality = charData.品质 || 'E';
+          var level = charData.等级 || 1;
+          html += '<div class="senki-wh-entry">' +
+            '<div>' +
+            '<div class="senki-wh-name">' + name + getSenkiFacBadge(pos) + '</div>' +
+            '<div class="senki-wh-info">' + quality + '级 Lv.' + level + ' · ' + (charData.元素属性 || '无') + '属性</div>' +
+            '</div>' +
+            '<div class="senki-wh-actions">' +
+            '<button class="senki-wh-btn senki-wh-withdraw"' + disabledAttr + ' data-swh-name="' + name + '">取出</button>' +
+            (pos !== '收藏室' ? '<button class="senki-wh-btn senki-wh-collection"' + disabledAttr + ' data-swh-name="' + name + '" data-swh-fac="collection">收藏室</button>' : '<button class="senki-wh-btn senki-wh-unassign"' + disabledAttr + ' data-swh-name="' + name + '" data-swh-fac="unassign">取消</button>') +
+            (pos !== '工作区' ? '<button class="senki-wh-btn senki-wh-work"' + disabledAttr + ' data-swh-name="' + name + '" data-swh-fac="work">工作区</button>' : '<button class="senki-wh-btn senki-wh-unassign"' + disabledAttr + ' data-swh-name="' + name + '" data-swh-fac="unassign">取消</button>') +
+            '</div></div>';
+        });
+      }
+
+      var battleChars = [];
+      Object.entries(chars).forEach(function(e) {
+        var d = e[1];
+        if (d.归属状态 === '出战' && (d.从属训练家 === currentData.玩家名 || !d.从属训练家)) {
+          battleChars.push({ name: e[0], data: d });
+        }
+      });
+
+      html += '<div class="wh-header">⚔️ 可存入 (' + battleChars.length + '只)</div>';
+      if (battleChars.length === 0) {
+        html += '<div class="list-empty" style="padding:16px;">无出战战姬可存入</div>';
+      } else {
+        battleChars.forEach(function(c) {
+          html += '<div class="senki-wh-entry">' +
+            '<div>' +
+            '<div class="senki-wh-name">⚔️ ' + c.name + '</div>' +
+            '<div class="senki-wh-info">' + (c.data.品质 || 'E') + '级 Lv.' + (c.data.等级 || 1) + ' · ' + (c.data.元素属性 || '无') + '属性</div>' +
+            '</div>' +
+            '<div style="flex-shrink:0;">' +
+            '<button class="senki-wh-btn wh-deposit-btn"' + disabledAttr + ' data-swh-deposit="' + c.name + '">存入</button>' +
+            '</div></div>';
+        });
+      }
+
+      $scroll.html(html);
+
+      $scroll.off('click.swhBack').on('click.swhBack', '#btn-swh-back', function() {
+        switchTab('trainer');
+      });
+      $scroll.off('click.swhWithdraw').on('click.swhWithdraw', '.senki-wh-withdraw', function(e) {
+        e.stopPropagation();
+        withdrawSenki($(this).data('swh-name'));
+      });
+      $scroll.off('click.swhAssign').on('click.swhAssign', '.senki-wh-collection, .senki-wh-work, .senki-wh-unassign', function(e) {
+        e.stopPropagation();
+        var name = $(this).data('swh-name');
+        var fac = $(this).data('swh-fac');
+        assignSenkiToFacility(name, fac);
+      });
+      $scroll.off('click.swhDeposit').on('click.swhDeposit', '.senki-wh-btn[data-swh-deposit]', function(e) {
+        e.stopPropagation();
+        depositSenki($(this).data('swh-deposit'));
+      });
+    }
+
+    async function depositSenki(name) {
+      if (getCurrentMessageId() !== getLastMessageId()) { notify('请在最新楼层操作', 'warning'); return; }
+      var charData = _.get(currentData, '角色数据.' + name);
+      if (!charData) { notify('战姬数据不存在', 'error'); return; }
+      try {
+        if (typeof updateVariablesWith !== 'function') { notify('变量更新不可用', 'error'); return; }
+        var charClone = JSON.parse(JSON.stringify(charData));
+        await updateVariablesWith(function(variables) {
+          _.unset(variables, 'stat_data.角色数据.' + name);
+          return variables;
+        }, { type: 'message' });
+        delete currentData.角色数据[name];
+        senkiWarehouseData[name] = { 数据: charClone, 位置: '仓库' };
+        saveSenkiWarehouseData();
+        notify(name + ' 已存入战姬仓库', 'success');
+      } catch(e) {
+        console.error('存入战姬失败:', e);
+        notify('存入失败，请重试', 'error');
+        return;
+      }
+      loadSenkiWarehouseData();
+      renderCurrentTab();
+    }
+
+    async function withdrawSenki(name) {
+      if (getCurrentMessageId() !== getLastMessageId()) { notify('请在最新楼层操作', 'warning'); return; }
+      var stored = senkiWarehouseData[name];
+      if (!stored || !stored.数据) { notify('仓库中无此战姬数据', 'error'); return; }
+      try {
+        if (typeof updateVariablesWith !== 'function') { notify('变量更新不可用', 'error'); return; }
+        var charClone = JSON.parse(JSON.stringify(stored.数据));
+        charClone.归属状态 = '出战';
+        var fac = stored.位置;
+        await updateVariablesWith(function(variables) {
+          _.set(variables, 'stat_data.角色数据.' + name, charClone);
+          if (fac === '收藏室') {
+            var list = _.get(variables, 'stat_data.训练家.据点.收藏室.当前使用', []);
+            _.set(variables, 'stat_data.训练家.据点.收藏室.当前使用', list.filter(function(n) { return n !== name; }));
+          }
+          if (fac === '工作区') {
+            var wlist = _.get(variables, 'stat_data.训练家.据点.工作区.当前使用', []);
+            _.set(variables, 'stat_data.训练家.据点.工作区.当前使用', wlist.filter(function(n) { return n !== name; }));
+          }
+          return variables;
+        }, { type: 'message' });
+        currentData.角色数据[name] = charClone;
+        if (fac === '收藏室') {
+          var cl = _.get(currentData, '训练家.据点.收藏室.当前使用', []);
+          _.set(currentData, '训练家.据点.收藏室.当前使用', cl.filter(function(n) { return n !== name; }));
+        }
+        if (fac === '工作区') {
+          var wl = _.get(currentData, '训练家.据点.工作区.当前使用', []);
+          _.set(currentData, '训练家.据点.工作区.当前使用', wl.filter(function(n) { return n !== name; }));
+        }
+        delete senkiWarehouseData[name];
+        saveSenkiWarehouseData();
+        notify(name + ' 已取回至出战队伍', 'success');
+      } catch(e) {
+        console.error('取出战姬失败:', e);
+        notify('取出失败，请重试', 'error');
+        return;
+      }
+      loadSenkiWarehouseData();
+      renderCurrentTab();
+    }
+
+    async function assignSenkiToFacility(name, facility) {
+      if (getCurrentMessageId() !== getLastMessageId()) { notify('请在最新楼层操作', 'warning'); return; }
+      var stored = senkiWarehouseData[name];
+      if (!stored) { notify('仓库中无此战姬', 'error'); return; }
+      try {
+        if (typeof updateVariablesWith !== 'function') { notify('变量更新不可用', 'error'); return; }
+        var oldFac = stored.位置 || '仓库';
+
+        await updateVariablesWith(function(variables) {
+          if (oldFac === '收藏室') {
+            var list = _.get(variables, 'stat_data.训练家.据点.收藏室.当前使用', []);
+            _.set(variables, 'stat_data.训练家.据点.收藏室.当前使用', list.filter(function(n) { return n !== name; }));
+          }
+          if (oldFac === '工作区') {
+            var wlist = _.get(variables, 'stat_data.训练家.据点.工作区.当前使用', []);
+            _.set(variables, 'stat_data.训练家.据点.工作区.当前使用', wlist.filter(function(n) { return n !== name; }));
+          }
+          if (facility === 'collection') {
+            var clist = _.get(variables, 'stat_data.训练家.据点.收藏室.当前使用', []);
+            if (clist.indexOf(name) < 0) clist.push(name);
+            _.set(variables, 'stat_data.训练家.据点.收藏室.当前使用', clist);
+          }
+          if (facility === 'work') {
+            var wlist2 = _.get(variables, 'stat_data.训练家.据点.工作区.当前使用', []);
+            if (wlist2.indexOf(name) < 0) wlist2.push(name);
+            _.set(variables, 'stat_data.训练家.据点.工作区.当前使用', wlist2);
+          }
+          return variables;
+        }, { type: 'message' });
+
+        var newFac = facility === 'collection' ? '收藏室' : (facility === 'work' ? '工作区' : '仓库');
+        senkiWarehouseData[name].位置 = newFac;
+        saveSenkiWarehouseData();
+
+        var facNames = { 'collection': '收藏室', 'work': '工作区', 'unassign': '仓库' };
+        notify(name + ' 已分配到 ' + (facNames[facility] || '仓库'), 'success');
+      } catch(e) {
+        console.error('分配战姬失败:', e);
+        notify('分配失败，请重试', 'error');
+        return;
+      }
+      loadSenkiWarehouseData();
+      renderCurrentTab();
+    }
+
+    function switchTab(tab) {
+      currentTab = tab;
+      currentView = 'list';
+      selectedCharName = null;
+
+      $('.nav-item').removeClass('active');
+      $(`#nav-${tab}`).addClass('active');
+
+      $('.list-panel').removeClass('active');
+      $('#detail-panel').removeClass('active');
+      $(`#panel-${tab}`).addClass('active');
+
+      renderList(tab);
+    }
+
+    function showCharDetail(name) {
+      selectedCharName = name;
+      currentView = 'detail';
+
+      $('.list-panel').removeClass('active');
+      $('#detail-panel').addClass('active');
+
+      renderCharDetail(name);
+    }
+
+    function showItemDetail(name, type) {
+      selectedCharName = name;
+      currentView = 'detail';
+
+      $('.list-panel').removeClass('active');
+      $('#detail-panel').addClass('active');
+
+      if (type === 'bag') {
+        renderBagDetail(name);
+      } else if (type === 'quest') {
+        renderQuestDetail(name);
+      }
+    }
+
+    function goBack() {
+      if (currentView === 'archive') {
+        currentView = 'detail';
+        selectedCharName = archiveState.charName;
+        showCharDetail(archiveState.charName);
+        return;
+      }
+      currentView = 'list';
+      selectedCharName = null;
+
+      $('#detail-panel').removeClass('active');
+      $(`#panel-${currentTab}`).addClass('active');
+
+      renderList(currentTab);
+    }
+
+    var skillBackupCache = {};
+    var learnMachineLock = {};
+    var archiveState = { charName: null, messageCount: 8 };
+    var archiveCache = {};
+
+    function showBondArchive(charName) {
+      var data = _.get(currentData, '角色数据.' + charName, null);
+      if (!data) { notify('角色数据不存在', 'error'); return; }
+      archiveState.charName = charName;
+      currentView = 'archive';
+      var archive = archiveCache[charName] || null;
+      if (archive) {
+        renderBondArchive(charName, archive);
+      } else {
+        promptBondArchiveGeneration(charName);
+      }
+    }
+
+    function promptBondArchiveGeneration(charName) {
+      var $scroll = $('#detail-scroll');
+      var isLatest = getCurrentMessageId() === getLastMessageId();
+
+      $('#detail-name').text('📖 羁绊档案');
+      $('#detail-badge').text(charName);
+      $('#detail-owner').html('');
+      $('#detail-actions').html('');
+
+      $scroll.html(
+        '<div style="text-align:center;padding:20px;">' +
+        '<div style="color:#94a3b8;font-size:13px;margin-bottom:12px;">还未生成羁绊档案</div>' +
+        '<div style="margin-bottom:12px;">' +
+        '<label style="color:#cbd5e1;font-size:12px;">选择作为上下文的最近楼层数: </label>' +
+        '<input type="number" id="archive-msg-count" value="8" min="0" max="12" style="width:60px;padding:4px 8px;border-radius:4px;border:1px solid #475569;background:#1e293b;color:#e2e8f0;font-size:13px;text-align:center;">' +
+        '<span style="color:#64748b;font-size:11px;margin-left:4px;">(0-12)</span>' +
+        '</div>' +
+        (isLatest ? '' : '<div style="color:#ef4444;font-size:11px;margin-bottom:8px;">⚠ 请在最新楼层操作</div>') +
+        '<button class="archive-btn" id="btn-generate-archive" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;"' + (isLatest ? '' : ' disabled') + '>🎯 开始生成</button>' +
+        '</div>'
+      );
+
+      $('#btn-generate-archive').off('click').on('click', function() {
+        var count = parseInt($('#archive-msg-count').val()) || 8;
+        if (count < 0) count = 0;
+        if (count > 12) count = 12;
+        generateBondArchive(charName, count);
+      });
+    }
+
+    function renderBondArchive(charName, archive) {
+      var $scroll = $('#detail-scroll');
+      var isLatest = getCurrentMessageId() === getLastMessageId();
+
+      $('#detail-name').text('📖 羁绊档案');
+      $('#detail-badge').text(charName);
+      $('#detail-owner').html('');
+      $('#detail-actions').html(
+        '<button class="archive-btn" id="btn-refresh-archive" style="background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;font-size:11px;padding:4px 10px;"' + (isLatest ? '' : ' disabled') + '>🔄 刷新</button>'
+      );
+
+      var content = archive;
+      var match = content.match(/<senki_archive>([\s\S]*?)<\/senki_archive>/i);
+      if (match && match[1].trim()) {
+        content = match[1].trim();
+      } else {
+        var hasOpen = /<senki_archive>/i.test(content);
+        var hasClose = /<\/senki_archive>/i.test(content);
+        if (hasOpen && !hasClose) content = '⚠ 生成错误: <senki_archive> 标签未闭合';
+        else if (!hasOpen) content = '⚠ 生成错误: 缺少 <senki_archive> 标签';
+        else content = '⚠ 生成错误: 标签内无内容';
+      }
+
+      $scroll.html(
+        '<div class="archive-card">' + content.replace(/\n/g, '<br>') + '</div>'
+      );
+
+      $('#btn-refresh-archive').off('click').on('click', function() {
+        if (!isLatest) { notify('请在最新楼层操作', 'warning'); return; }
+        promptBondArchiveGeneration(charName);
+      });
+    }
+
+    async function generateBondArchive(charName, messageCount) {
+      if (getCurrentMessageId() !== getLastMessageId()) { notify('请在最新楼层操作', 'warning'); return; }
+
+      var $scroll = $('#detail-scroll');
+      $scroll.html('<div style="text-align:center;padding:30px;color:#94a3b8;">⏳ 正在生成羁绊档案（使用最近 ' + messageCount + ' 条聊天记录作为上下文）...</div>');
+
+      try {
+        var charData = _.get(currentData, '角色数据.' + charName, {});
+        var chatMessages = [];
+
+        if (messageCount > 0) {
+          chatMessages = getChatMessages('-' + messageCount + '-' + '-1', { role: 'all', hide_state: 'unhidden' });
+        }
+
+        var chatContext = '';
+        if (chatMessages.length > 0) {
+          chatContext = chatMessages.map(function(m) {
+            var roleLabel = m.role === 'user' ? '玩家' : (m.role === 'assistant' ? (m.name || '助理') : '系统');
+            return '[' + roleLabel + ']: ' + m.message;
+          }).join('\n\n');
+        } else {
+          chatContext = '（无可用聊天上下文）';
+        }
+
+        var archivePrompt = [
+          '# 战后羁绊档案生成（完整思维链）',
+          '',
+          '## 世界观背景（战姬捕捉系统）',
+          '- 战斗在独立"相位空间"中进行，与现实世界隔离，外界看来只是短暂失神',
+          '- 训练家可派遣战姬进行 1v1/2v2/3v3 对战或野生捕捉',
+          '- 强弱判定：等级差距、属性克制（克制×1.5/被克制×0.67）、技能稀有度、战姬品质、好感度加成、堕落值影响',
+          '- 捕捉条件：目标HP<20%、持有捕捉球、目标无主、成功率受品质/状态/意志影响',
+          '- 战姬无法攻击训练家（系统硬性限制）',
+          '- 失败惩罚：战姬重伤24h、可能失去战姬、训练家无资源时被转化为战姬',
+          '',
+          '## 战姬数据',
+          '名称: ' + charName,
+          '品质: ' + (charData.品质 || 'E'),
+          '等级: ' + (charData.等级 || 1),
+          '属性: ' + (charData.属性 || '无'),
+          '外貌: ' + (charData.外貌 || '未设定'),
+          '性格: ' + (charData.性格 || '未设定'),
+          '性器状态: ' + JSON.stringify(charData.性器状态 || {}),
+          '个人资料: ' + JSON.stringify(charData.个人资料 || {}),
+          '',
+          '## 最近聊天上下文 (' + chatMessages.length + '条)',
+          chatContext,
+          '',
+          '## === 羁绊档案生成思维链（必读） ===',
+          '',
+          '### 步骤0_数据确认',
+          '从战姬数据和聊天上下文中提取：',
+          '- 战姬姓名、前主人（若有）、前置关系类型（陌生/同学/青梅/恋人/亲属/师生/仇人）',
+          '- 服役时长（根据上下文推断，可虚构）',
+          '- 前主态度（宠爱/工具/虐待/共享/放置）',
+          '- 当前好感度、性器状态（身体开发程度）',
+          '',
+          '### 步骤1_关系与情感基调分析',
+          '六种关系类型：',
+          '1) 深爱的恋人：甜蜜回忆+撕裂感+对爱情的执念',
+          '2) 禁忌的亲属：禁忌的甜蜜+伦理崩塌+羞耻的快感',
+          '3) 青梅竹马：青涩甜蜜+成长痛苦+失去绝望',
+          '4) 陌生人：冷漠使用+身体痛苦+解脱或麻木',
+          '5) 师生/上下级：权力征服+臣服快感+失去依靠',
+          '6) 仇人：仇恨调教+复仇快感+解脱希望',
+          '根据前主人与战姬的关系类型确定情感主线。',
+          '',
+          '### 步骤2_调教经历与身体开发（2-3个场景）',
+          '场景1_第一次：关系跨越禁忌的瞬间，心理防线的崩塌',
+          '  - 恋人：温柔的初夜，她主动献身，事后幸福依偎',
+          '  - 母子：禁忌突破，哭着求饶但身体背叛，事后羞耻到无法直视',
+          '  - 陌生人：粗暴强暴，绝望挣扎，事后蜷缩哭泣',
+          '',
+          '场景2_最羞耻的一次：展现调教深度和心理变化',
+          '  - 羞耻来源：公共场合/当众/多人/道具',
+          '  - 她的反应：哭泣/崩溃/高潮/麻木',
+          '',
+          '场景3_最深刻的一次：定义关系核心，最强情感记忆',
+          '  - 恋人：他温柔说"我爱你"，她哭着高潮，确认心意',
+          '  - 母子：他哭着说"妈妈我爱你"，她崩溃接受扭曲的爱',
+          '  - 陌生人：他冷漠内射，她麻木承受，从此放弃抵抗',
+          '',
+          '身体开发细节需整合性器状态数据，描写各部位从生疏到熟练的过程。',
+          '',
+          '### 步骤3_外貌与着装视觉化（9项必填，不可遗漏）',
+          '1) 发型发色：长度/质地/颜色/造型/发饰',
+          '2) 脸蛋：脸型/五官/眼睛/鼻子/嘴唇/表情',
+          '3) 肌肤颜色：肤色/质地/触感',
+          '4) 衣裙样式颜色：上装/下装/款式/颜色/材质/状态（结合调教：原本纯洁→被撕破→情趣装）',
+          '5) 双乳大小形状：罩杯/形状/乳头/乳晕/触感/标记（开发度<30粉嫩，30-60敏感略大，>60肥大深色有穿环）',
+          '6) 大腿小腿：粗细/形状/肤色/触感/标记',
+          '7) 袜子样式颜色：类型/颜色/材质/状态',
+          '8) 臀部形状手感：大小/形状/弹性/触感/标记',
+          '9) 鞋子样式：类型/颜色/款式/状态',
+          '所有描写必须具体，禁止模糊词（如"很美"）。结合前主关系和调教经历，让外貌有故事感。',
+          '',
+          '### 步骤4_心理状态与被夺走瞬间',
+          '三层分析：',
+          '层次1_对前主的情感定位：',
+          '  - 深爱型："他是我的全部..."被夺走时撕心裂肺的痛苦与歉意',
+          '  - 依恋型（斯德哥尔摩）："我离不开他..."失去依靠的恐慌',
+          '  - 禁忌型：解脱与失落并存，伦理崩塌的羞耻与愧疚',
+          '  - 恐惧/仇恨型：强烈解脱感，对新主的感激',
+          '  - 冷漠麻木型：无情感，"换了个主人而已"',
+          '',
+          '层次2_被夺走瞬间的心理活动：',
+          '  - 深爱型内心独白：哀求新主/对前主道歉/自责/绝望中的誓言',
+          '  - 依恋型内心独白：渴望前主/恐惧未来',
+          '  - 禁忌型内心独白：解脱+失落+愧疚',
+          '  - 解脱型内心独白：如释重负+警惕但期待',
+          '',
+          '层次3_对前主关系的主观评价：',
+          '  - 甜蜜回忆（深爱/依恋/禁忌合理化后）',
+          '  - 痛苦噩梦（恐惧/仇恨）',
+          '  - 麻木空白（冷漠麻木）',
+          '',
+          '被夺走瞬间需描写：她的视线、她的话语、她的身体语言。',
+          '',
+          '### 步骤5_前主视角与互动细节',
+          '三个代表性互动场景：',
+          '场景A_关系起点：告白/禁忌跨越/被捕捉',
+          '场景B_关系深化：第一次自愿性行为/伦理崩塌/抵抗消失',
+          '场景C_最具冲击力的一次：深情告白/主动索求/彻底崩溃',
+          '每个场景需包含：时间地点、氛围、对话、行为、她的心理。',
+          '',
+          '### 步骤6_字数分配与结构规划',
+          '总字数1200~2000字，段落分配：',
+          '- 档案头（基本信息）: 50~80字',
+          '- 关系起源: 150~250字',
+          '- 调教经历（2-3个场景）: 400~600字',
+          '- 外貌与身体描写: 300~400字',
+          '- 心理状态与被夺走瞬间: 250~350字',
+          '- 结语: 50~100字',
+          '',
+          '### 步骤7_最终校验（五道防线）',
+          '防线1_外貌检查：9项必填是否全部包含？',
+          '防线2_字数检查：1200~2000字范围？',
+          '防线3_情感逻辑自洽（防止矛盾）：',
+          '  - 深爱恋人被宠爱却写成痛苦回忆 → 矛盾',
+          '  - 极端虐待却写成甜蜜回忆 → 矛盾',
+          '  - 陌生人却写出深情 → 矛盾',
+          '  - 处女却口交精通 → 矛盾',
+          '防线4_色情描写强度：是否有具体性行为描写？身体反应？羞耻细节？视觉冲击？',
+          '防线5_NTR核心体现：前主与她的关系是否亲密？被夺走撕裂感是否强烈？',
+          '',
+          '### 步骤8_输出格式',
+          '- 思考过程用 <thinking> 标签包裹（英文，简洁）',
+          '- 档案正文用 <senki_archive> 标签包裹',
+          '- 第三人称R18小说风格，中文，详细淫靡情感细腻',
+          '- 档案头格式示例：',
+          '  ═══════════════════════════════════════',
+          '  ◆ 羁绊档案：[姓名]',
+          '  ═══════════════════════════════════════',
+          '  前主人：[代号]',
+          '  原际关系：[关系类型]',
+          '  服役时长：[时长]',
+          '  获取方式：在决斗中作为赌注被输掉/被夺取',
+          '',
+          '注意：如果聊天上下文中包含前主人信息，请使用；否则根据战姬数据合理推断或随机生成。前主人不存在时请合理虚构一个。',
+          '必须是NTR风格，描写被夺走的撕裂感。',
+          '务必执行步骤7的最终校验，确保档案质量。'
+        ].join('\n');
+
+        var archiveOk = false;
+        var archiveText = '';
+
+        try {
+          var result = await generateRaw({
+            ordered_prompts: [{ role: 'system', content: archivePrompt }],
+            should_silence: true,
+            temperature: 0.85
+          });
+          var text = typeof result === 'string' ? result : (result.content || '');
+          if (text) { archiveText = text; archiveOk = true; }
+        } catch(e) {
+          console.error('羁绊档案生成第1次失败:', e);
+        }
+
+        if (!archiveOk || !/<senki_archive>/i.test(archiveText)) {
+          $scroll.html('<div style="text-align:center;padding:20px;color:#94a3b8;">⚠ 格式异常，正在重试...</div>');
+          try {
+            var result2 = await generateRaw({
+              ordered_prompts: [{ role: 'system', content: archivePrompt + '\n\n【重要】输出必须包含<senki_archive>标签包裹档案正文。只返回JSON不要思考过程。' }],
+              should_silence: true,
+              temperature: 0.7
+            });
+            var text2 = typeof result2 === 'string' ? result2 : (result2.content || '');
+            if (text2) { archiveText = text2; archiveOk = true; }
+          } catch(e2) {
+            console.error('羁绊档案重试失败:', e2);
+          }
+        }
+
+        if (archiveOk && archiveText) {
+          archiveCache[charName] = archiveText;
+          notify(charName + ' 羁绊档案已生成', 'success');
+          renderBondArchive(charName, archiveText);
+        } else {
+          throw new Error(archiveText ? '格式不符合要求' : '生成结果为空');
+        }
+
+      } catch(e) {
+        console.error('羁绊档案生成失败:', e);
+        $scroll.html(
+          '<div style="text-align:center;padding:20px;">' +
+          '<div style="color:#ef4444;font-size:12px;margin-bottom:8px;">生成失败: ' + (e.message || '未知错误') + '</div>' +
+          '<button class="archive-btn" id="btn-retry-archive" style="background:#6366f1;color:#fff;">🔄 重试</button>' +
+          '</div>'
+        );
+        $('#btn-retry-archive').off('click').on('click', function() {
+          promptBondArchiveGeneration(charName);
+        });
+      }
+    }
+
+    async function restoreSkillsBackup(charName) {
+      var backup = skillBackupCache[charName];
+      if (!backup) { notify('没有可恢复的技能备份', 'warning'); return; }
+      try {
+        await updateVariablesWith(function(variables) {
+          _.set(variables, 'stat_data.角色数据.' + charName + '.技能', backup);
+          return variables;
+        }, { type: 'message' });
+        delete skillBackupCache[charName];
+        Object.keys(learnMachineLock).forEach(function(k) {
+          if (k.indexOf(charName + '_') === 0) delete learnMachineLock[k];
+        });
+        populateCharacterData();
+        renderCurrentTab();
+        notify(charName + ' 技能已恢复到上次状态', 'success');
+      } catch(e) {
+        console.error('技能恢复失败:', e);
+        notify('恢复失败', 'error');
+      }
+    }
+
+    function getFormTag(form) {
+      if (!form || form === '无') return '<span class="form-tag form-none">⚪ 无</span>';
+      const map = {
+        '天使化': ['form-angel', '👼'],
+        '恶魔化': ['form-demon', '😈'],
+        '精灵化': ['form-elf', '🧝'],
+        '兽人化': ['form-beast', '🐾']
+      };
+      const [cls, icon] = map[form] || ['form-none', '⚪'];
+      return `<span class="form-tag ${cls}">${icon} ${form}</span>`;
+    }
+
+    function getSensTag(sens) {
+      const map = {
+        '迟钝': 'sens-dull',
+        '普通': 'sens-normal',
+        '敏感': 'sens-sensitive',
+        '过敏': 'sens-hyper',
+        '淫乱': 'sens-lewd'
+      };
+      return `<span class="sens-tag ${map[sens] || 'sens-normal'}">${sens || '普通'}</span>`;
+    }
+
+    function getSkillTypeTag(type) {
+      const map = {
+        '主动': ['stt-active', '⚔️'],
+        '被动': ['stt-passive','🛡️'],
+        '光环': ['stt-aura', '✨'],
+        '天赋': ['stt-talent', '🌟']
+      };
+      const [cls, icon] = map[type] || ['stt-active', '⚔️'];
+      return `<span class="skill-type-tag ${cls}">${icon}</span>`;
+    }
+
+    function getRarityTag(rarity) {
+      const map = {
+        'N': 'sr-normal',
+        '普通': 'sr-normal',
+        '稀有': 'sr-rare',
+        '史诗': 'sr-epic',
+        '传说': 'sr-legend',
+        '神话': 'sr-myth'
+      };
+      const displayMap = { 'N': 'N', '普通': '普通', '稀有': '稀有', '史诗': '史诗', '传说': '传说', '神话': '神话' };
+      return `<span class="skill-rarity ${map[rarity] || 'sr-normal'}">${displayMap[rarity] || rarity || '普通'}</span>`;
+    }
+
+    function renderCharDetail(name) {
+      const data = _.get(currentData, `角色数据.${name}`, null);
+      if (!data) return;
+
+      const playerName = (_.get(currentData, '玩家名', 'lin') || '').trim();
+      const $scroll = $('#detail-scroll');
+
+      $('#detail-name').text(name);
+      $('#detail-badge').text(`${data.品质 || 'E'}级 Lv.${data.等级 || 1}`);
+
+      const relation = _.get(data, '个人资料.与训练家关系', '');
+      const owner = (data.从属训练家 || '').trim();
+      let ownerHtml = '';
+      if (relation) {
+        ownerHtml = `<div class="char-identity">💕 ${relation}</div>`;
+      }
+      if (owner && owner !== playerName) {
+        ownerHtml += `<div class="char-owner">👤 隶属于 <span class="owner-name">${owner}</span></div>`;
+      }
+      $('#detail-owner').html(ownerHtml);
+
+      var isAllyChar = (owner === '' || owner === playerName);
+      var isLatest = getCurrentMessageId() === getLastMessageId();
+      var shopDisabled = isLatest ? '' : ' disabled title="请在最新楼层操作"';
+      if (isAllyChar && data.归属状态 === '出战') {
+        $('#detail-actions').html('<button class="senki-store-btn" id="btn-store-senki"' + shopDisabled + '>📦 存入仓库</button>');
+      } else {
+        $('#detail-actions').html('');
+      }
+
+      let html = '';
+
+      const thought = data.当前想法 || '';
+      if (thought) {
+        html += `<div class="thought-box">${thought}</div>`;
+      }
+
+      const hp = data.生命值 || {};
+      const mp = data.法力值 || {};
+      const exp = data.经验值 || {};
+      const hpPct = hp.最大值 ? Math.min(100, (hp.当前值 / hp.最大值) * 100) : 0;
+      const mpPct = mp.最大值 ? Math.min(100, (mp.当前值 / mp.最大值) * 100) : 0;
+      const expPct = exp.升级所需值 ? Math.min(100, (exp.当前值 / exp.升级所需值) * 100) : 0;
+
+      html += `
+        <div class="bar-group">
+          <div class="bar-row">
+            <span class="bar-icon">❤️</span>
+            <div class="bar-track"><div class="bar-fill fill-hp" style="width:${hpPct}%"></div></div>
+            <span class="bar-text">${hp.当前值 || 0}/${hp.最大值 || 0}</span>
+          </div>
+          <div class="bar-row">
+            <span class="bar-icon">💧</span>
+            <div class="bar-track"><div class="bar-fill fill-mp" style="width:${mpPct}%"></div></div>
+            <span class="bar-text">${mp.当前值 || 0}/${mp.最大值 || 0}</span>
+          </div>
+          <div class="bar-row">
+            <span class="bar-icon">⭐</span>
+            <div class="bar-track"><div class="bar-fill fill-exp" style="width:${expPct}%"></div></div>
+            <span class="bar-text">${exp.当前值 || 0}/${exp.升级所需值 || 100}</span>
+          </div>
+        </div>
+      `;
+
+      html += `
+        <div class="section">
+          <div class="section-head" data-section="basic"><span>📊 基础资料</span><span class="toggle-icon">▼</span></div>
+          <div class="section-body" id="body-basic">
+            <div class="data-grid">
+              <div class="data-cell"><span class="cell-label">⚔️ 类型</span><span class="cell-value">${data.战斗类型 || '均衡'}</span></div>
+              <div class="data-cell"><span class="cell-label">🔮 属性</span><span class="cell-value">${data.元素属性 || '无'}</span></div>
+              <div class="data-cell"><span class="cell-label">😊 性格</span><span class="cell-value">${data.性格 || '认真'}</span></div>
+              <div class="data-cell"><span class="cell-label">💫 资质</span><span class="cell-value">${data.资质 || '普通'}</span></div>
+              <div class="data-cell full"><span class="cell-label">✨ 变化形态</span><span class="cell-value">${getFormTag(data.变化形态)}</span></div>
+              <div class="data-cell"><span class="cell-label">💕 好感度</span><span class="cell-value love">${data.好感度 || 0}</span></div>
+              <div class="data-cell"><span class="cell-label">😈 堕落值</span><span class="cell-value corr">${data.堕落值 || 0}</span></div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      html += `
+        <div class="section">
+          <div class="section-head" data-section="stats"><span>⚡ 属性面板</span><span class="toggle-icon">▼</span></div>
+          <div class="section-body" id="body-stats">
+            <div class="data-grid">
+              <div class="data-cell"><span class="cell-label">⚔️ 攻击力</span><span class="cell-value">${data.攻击力 || 0}</span></div>
+              <div class="data-cell"><span class="cell-label">🛡️ 防御力</span><span class="cell-value">${data.防御力 || 0}</span></div>
+              <div class="data-cell"><span class="cell-label">🔮 特攻</span><span class="cell-value">${data.特攻 || 0}</span></div>
+              <div class="data-cell"><span class="cell-label">💎 特防</span><span class="cell-value">${data.特防 || 0}</span></div>
+              <div class="data-cell full"><span class="cell-label">⚡ 速度</span><span class="cell-value">${data.速度 || 0}</span></div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const equip = data.着装 || {};
+      html += `
+        <div class="section">
+          <div class="section-head" data-section="equip"><span>👗 着装</span><span class="toggle-icon">▼</span></div>
+          <div class="section-body" id="body-equip">
+      `;
+      if (equip.上装 || equip.下装 || equip.内衣 || equip.鞋袜 || equip.饰品) {
+        if (equip.上装) html += `<div class="equip-item"><span class="equip-icon">👚</span><span class="equip-name">${equip.上装}</span></div>`;
+        if (equip.下装) html += `<div class="equip-item"><span class="equip-icon">👖</span><span class="equip-name">${equip.下装}</span></div>`;
+        if (equip.内衣) html += `<div class="equip-item"><span class="equip-icon">👙</span><span class="equip-name">${equip.内衣}</span></div>`;
+        if (equip.鞋袜) html += `<div class="equip-item"><span class="equip-icon">👠</span><span class="equip-name">${equip.鞋袜}</span></div>`;
+        if (equip.饰品) html += `<div class="equip-item"><span class="equip-icon">💍</span><span class="equip-name">${equip.饰品}</span></div>`;
+      } else {
+        html += '<div style="color:#64748b; font-size:11px; padding:6px;">无装备</div>';
+      }
+      html += `</div></div>`;
+
+      const battleOutfit = data.战斗衣着 || '';
+      html += `
+        <div class="section">
+          <div class="section-head" data-section="battle-outfit"><span>⚔️ 战斗服饰</span><span class="toggle-icon">▼</span></div>
+          <div class="section-body" id="body-battle-outfit">
+            ${battleOutfit ? `
+              <div class="profile-item" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(79, 70, 229, 0.1) 100%); border: 1px solid rgba(99, 102, 241, 0.3);">
+                <div style="font-size:13px;font-weight:bold;color:#a5b4fc;margin-bottom:4px;">⚔️ 专属战斗装</div>
+                <div style="font-size:12px;color:#e2e8f0;line-height:1.5;">${battleOutfit}</div>
+              </div>
+            ` : '<div style="color:#64748b; font-size:11px; padding:6px;">未设定战斗服饰</div>'}
+          </div>
+        </div>
+      `;
+
+      const skills = data.技能 || {};
+      html += `
+        <div class="section">
+          <div class="section-head" data-section="skills"><span>⚡ 技能列表</span><span class="toggle-icon">▼</span></div>
+          <div class="section-body" id="body-skills">
+      `;
+      var maxSlots = (typeof getSkillSlotCount === 'function' ? getSkillSlotCount() : 6);
+      var skillEntries = Object.entries(skills);
+      var hasAnySkill = skillEntries.length > 0;
+
+      var slotData = {};
+      var unnamed = [];
+
+      skillEntries.forEach(function(_ref) {
+        var key = _ref[0], val = _ref[1];
+        var m = key.match(/^槽位_(\d+)$/);
+        if (m) {
+          var sn = parseInt(m[1], 10);
+          if (sn >= 1 && sn <= maxSlots) { slotData[sn] = { skill: val, name: val.name || null }; return; }
+        }
+        unnamed.push({ skill: val, name: (val.name || key) });
+      });
+
+      var nextSlot = 1;
+      unnamed.forEach(function(item) {
+        while (slotData[nextSlot] && nextSlot <= maxSlots) nextSlot++;
+        if (nextSlot <= maxSlots) { slotData[nextSlot] = item; nextSlot++; }
+      });
+
+      for (var slotNum = 1; slotNum <= maxSlots; slotNum++) {
+        var sd = slotData[slotNum];
+        var skillKey = '槽位_' + slotNum;
+        if (sd) {
+          var skill = sd.skill;
+          var label = window.SLOT_LABELS && window.SLOT_LABELS[slotNum];
+          var typeTag = getSkillTypeTag(skill.类型);
+          var rarityTag = getRarityTag(skill.稀有度);
+          var skillMp = skill.消耗MP || 0;
+          var cd = skill.冷却回合 || 0;
+          var power = skill.基础威力 || 0;
+          var displayName = sd.name || skill.name || skillKey;
+
+          html += `
+            <div class="skill-card${skill.稀有度 === '神话' ? ' mythic' : ''}">
+              <div class="skill-header">
+                <div class="skill-name">
+                  ${label ? `<span class="slot-badge">${label.name}</span>` : ''}
+                  ${typeTag} ${rarityTag} ${displayName}
+                </div>
+                <div class="skill-meta">
+                  ${skillMp > 0 ? `<span class="skill-mp">💧${skillMp}</span>` : ''}
+                  ${cd > 0 ? `<span class="skill-cd">⏱️CD:${cd}</span>` : ''}
+                  ${power > 0 ? `<span style="font-size:10px;color:#f59e0b;font-weight:bold;">💥${power}</span>` : ''}
+                  <button class="btn-refresh-skill" data-char-name="${name}" data-slot-key="${skillKey}" title="重铸此技能" style="margin-left:4px;${!isLatest ? 'opacity:0.5;pointer-events:none;' : ''}" ${!isLatest ? 'disabled' : ''}>🔄</button>
+                </div>
+              </div>
+              ${label ? `<div class="slot-type-hint">${label.desc}</div>` : ''}
+              <div class="skill-desc">${skill.描述 || '无描述'}</div>
+              ${skill.效果公式 ? `<div class="skill-formula">📐 ${skill.效果公式}</div>` : ''}
+            </div>
+          `;
+        } else if (hasAnySkill) {
+          html += `
+            <div class="skill-card" style="opacity:0.5;border:1px dashed #475569;">
+              <div class="skill-header">
+                <div class="skill-name">
+                  <span class="slot-badge">槽位 ${slotNum}</span>
+                  <span style="color:#64748b;font-size:11px;">空</span>
+                </div>
+                <div class="skill-meta">
+                  <span style="color:#475569;font-size:10px;">可使用学习机</span>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+      }
+      if (!hasAnySkill) {
+        html += `
+          <div style="text-align:center;padding:10px;">
+            <div style="color:#64748b;font-size:11px;margin-bottom:8px;">暂无技能</div>
+            <button class="btn-gen-skills" data-char-name="${name}" style="padding:6px 16px;font-size:12px;background:#6366f1;color:#fff;border:none;border-radius:4px;cursor:pointer;${!isLatest ? 'opacity:0.5;' : ''}" ${!isLatest ? 'disabled' : ''}>⚡ 生成技能</button>
+          </div>
+        `;
+      }
+      html += `</div></div>`;
+
+      const profile = data.个人资料 || {};
+      html += `
+        <div class="section">
+          <div class="section-head" data-section="profile"><span>📋 个人资料</span><span class="toggle-icon">▼</span></div>
+          <div class="section-body" id="body-profile">
+      `;
+      if (profile.原身份) html += `<div class="profile-item"><span class="p-label">🎭 原身份：</span><span class="p-value">${profile.原身份}</span></div>`;
+      if (profile.捕获经过) html += `<div class="profile-item"><span class="p-label">📖 捕获经过：</span><span class="p-value">${profile.捕获经过}</span></div>`;
+      if (profile.过往经历) html += `<div class="profile-item"><span class="p-label">📜 过往经历：</span><span class="p-value">${profile.过往经历}</span></div>`;
+      if (profile.与训练家关系) html += `<div class="profile-item"><span class="p-label">💕 与训练家关系：</span><span="p-value">${profile.与训练家关系}</span></div>`;
+      if (profile.喜好体位) html += `<div class="profile-item highlight"><span class="p-label">💗 喜好体位：</span><span class="p-value">${profile.喜好体位}</span></div>`;
+      if (profile.性癖) html += `<div class="profile-item highlight"><span class="p-label">💋 性癖：</span><span class="p-value">${profile.性癖}</span></div>`;
+      if (profile.性格特征) html += `<div class="profile-item"><span class="p-label">✨ 性格特征：</span><span class="p-value">${profile.性格特征}</span></div>`;
+      html += `</div></div>`;
+
+      const sexual = data.性器状态 || {};
+      let sexualHtml = '';
+
+      if (Object.keys(sexual).length > 0) {
+        sexualHtml += `
+          <div class="overall-card">
+            <div class="overall-row"><span class="overall-label">💕 整体淫乱度</span><span class="overall-value">${sexual.整体淫乱度 || 0}%</span></div>
+            <div class="overall-row"><span class="overall-label">🔥 当前性欲</span><span class="overall-value">${sexual.当前性欲 || 0}%</span></div>
+            <div class="overall-row"><span class="overall-label">📊 性经验次数</span><span class="overall-value">${sexual.性经验次数 || 0}次</span></div>
+            <div class="overall-row"><span class="overall-label">💦 高潮体质</span><span class="overall-value">${sexual.高潮体质 || '普通'}</span></div>
+          </div>
+        `;
+
+        const organs = [
+          ['🍒', '胸部', sexual.胸部 || {}, ['尺寸', '乳头状态']],
+          ['🌸', '阴部', sexual.阴部 || {}, ['处女膜', '紧致度']],
+          ['💎', '阴蒂', sexual.阴蒂 || {}, ['大小']],
+          ['🍑', '后庭', sexual.后庭 || {}, ['紧致度']],
+          ['💗', '子宫', sexual.子宫 || {}, ['状态']],
+          ['👄', '口腔', sexual.口腔 || {}, ['技巧', '深喉适应']]
+        ];
+
+        sexualHtml += '<div class="organ-grid">';
+        organs.forEach(([icon, oname, odata, fields]) => {
+          let rows = '';
+          fields.forEach(f => {
+            if (odata[f]) {
+              rows += `<div class="organ-row"><span class="organ-label">${f}</span><span class="organ-value">${odata[f]}</span></div>`;
+            }
+          });
+          if (odata.敏感度) {
+            rows += `<div class="organ-row"><span class="organ-label">敏感度</span>${getSensTag(odata.敏感度)}</div>`;
+          }
+          const dev = odata.开发度;
+          const currentState = odata.当前状态 || '';
+
+          sexualHtml += `
+            <div class="organ-card">
+              <div class="organ-title">${icon} ${oname}</div>
+              ${rows}
+              ${dev !== undefined ? `<div class="organ-row"><span class="organ-label">开发度</span><span class="organ-value">${dev}%</span></div><div class="dev-bar"><div class="dev-fill" style="width:${dev}%"></div></div>` : ''}
+              ${currentState ? `<div class="organ-state">👁️ ${currentState}</div>` : ''}
+            </div>
+          `;
+        });
+        sexualHtml += '</div>';
+      } else {
+        sexualHtml = '<div style="color:#64748b; font-size:11px; padding:6px;">暂无数据</div>';
+      }
+
+      html += `
+        <div class="section">
+          <div class="section-head" data-section="sexual"><span>💕 性器状态</span><span class="toggle-icon">▼</span></div>
+          <div class="section-body" id="body-sexual">
+            ${sexualHtml}
+          </div>
+        </div>
+      `;
+
+      var hasArchive = !!archiveCache[name];
+      var archiveBtnText = hasArchive ? '📖 查看羁绊档案' : '📖 生成羁绊档案';
+      html += '<div style="padding:8px 0;text-align:center;">' +
+        '<button class="archive-btn" id="btn-bond-archive" data-char-name="' + name + '" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;">' + archiveBtnText + '</button>' +
+        '</div>';
+
+      var hasBackup = !!skillBackupCache[name];
+      if (hasBackup) {
+        html += '<div style="padding:4px 0;text-align:center;">' +
+          '<button class="archive-btn" id="btn-restore-skills" data-char-name="' + name + '" style="background:#ef4444;color:#fff;font-size:12px;padding:4px 12px;">↩ 恢复上次技能</button>' +
+          '</div>';
+      }
+
+      $scroll.html(html);
+
+      Object.keys(collapsedSections).forEach(sectionId => {
+        if (collapsedSections[sectionId]) {
+          $(`.section-head[data-section="${sectionId}"]`).addClass('collapsed');
+          $(`#body-${sectionId}`).addClass('collapsed');
+        }
+      });
+    }
+
+    function renderBagDetail(name) {
+      const data = _.get(currentData, `背包.${name}`, {});
+      const isLatest = getCurrentMessageId() === getLastMessageId();
+      const disabledAttr = isLatest ? '' : ' disabled title="请在最新楼层操作"';
+
+      $('#detail-name').text(`🎒 ${name}`);
+      $('#detail-badge').text(`×${data.数量 || 0}`);
+      $('#detail-owner').html('');
+
+      const detailedDesc = ITEM_DESC_MAP[name] || data.描述 || '无描述';
+      var learnRarity = window.SKILL_LEARN_MACHINE_MAP[name];
+
+      var actionsHtml = '';
+      if (learnRarity && isLatest) {
+        actionsHtml = '<button class="wh-action-btn" id="btn-use-learn" style="background:linear-gradient(135deg,#a78bfa,#7c3aed);color:white;">🎓 使用学习机</button>';
+      }
+
+      $('#detail-actions').html(actionsHtml);
+
+      $('#detail-scroll').html(`
+        <div class="info-card">
+          <div class="info-row">
+            <span class="info-label">📝 描述</span>
+            <span class="info-value">${detailedDesc}</span>
+          </div>
+        </div>
+      `);
+    }
+
+    function renderQuestDetail(key) {
+      const data = _.get(currentData, `任务列表.${key}`, {});
+
+      $('#detail-name').text(`📜 ${data.名称 || key}`);
+      $('#detail-badge').text(data.类型 || '任务');
+      $('#detail-owner').html('');
+
+      const statusCls = data.已完成 ? 'qs-done' : 'qs-progress';
+      const statusText = data.已完成 ? '✅ 已完成' : '⏳ 进行中';
+
+      $('#detail-scroll').html(`
+        <div class="info-card">
+          <div class="quest-status ${statusCls}">${statusText}</div>
+          <div class="info-row">
+            <span class="info-label">📋 要求</span>
+            <span class="info-value">${data.要求 || '-'}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">🎁 奖励</span>
+            <span class="info-value reward">${data.奖励 || '-'}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">⏰ 期限</span>
+            <span class="info-value">${data.期限 || '无限制'}</span>
+          </div>
+          ${data.进度 ? `<div class="info-row"><span class="info-label">📊 进度</span><span class="info-value">${data.进度}</span></div>` : ''}
+        </div>
+      `);
+    }
+
+    function toggleSection(sectionId) {
+      const $head = $(`.section-head[data-section="${sectionId}"]`);
+      const $body = $(`#body-${sectionId}`);
+      $head.toggleClass('collapsed');
+      $body.toggleClass('collapsed');
+
+      collapsedSections[sectionId] = $head.hasClass('collapsed');
+    }
+
+    function toggleCategory(category, event) {
+      if (event) {
+        event.stopPropagation();
+      }
+
+      const $head = $(`.category-header[data-category="${category}"]`);
+      const $content = $(`#cat-${category}`);
+
+      $head.toggleClass('collapsed');
+      $content.toggleClass('collapsed');
+
+      collapsedCategories[category] = $head.hasClass('collapsed');
+    }
+
+    // === 技能生成系统 ===
+    window.SKILL_RARITY_ORDER = ['N', '普通', '稀有', '史诗', '传说', '神话'];
+    window.SKILL_LEARN_MACHINE_MAP = {
+      '普通技能学习机': '普通',
+      '稀有技能学习机': '稀有',
+      '史诗技能学习机': '史诗',
+      '传说技能学习机': '传说'
+    };
+    window.SKILL_PARAM_KEYS = ['系数','伤害类型','暴击率加成','吸血比例','命中率','灼烧概率','灼烧伤害','灼烧回合','中毒概率','中毒伤害','中毒回合','冰冻概率','冰冻回合','麻痹概率','麻痹回合','混乱概率','混乱回合','攻击加成','防御加成','特攻加成','特防加成','速度加成','命中加成','闪避加成','持续回合','治疗量','治疗比例','护盾值','护盾比例'];
+    window.SLOT_LABELS = {
+      1: { name: 'Ⅰ', desc: '低消耗攻击' },
+      2: { name: 'Ⅱ', desc: '' },
+      3: { name: 'Ⅲ', desc: '' },
+      4: { name: 'Ⅳ', desc: '' },
+      5: { name: 'Ⅴ', desc: '' },
+      6: { name: 'Ⅵ', desc: '' }
+    };
+
+    function getSlotRarityLimit(quality, slotIndex) {
+      if (slotIndex === 1) {
+        return { E:'普通', D:'普通', C:'稀有', B:'稀有', A:'史诗', S:'传说' }[quality] || '史诗';
+      }
+      return '神话';
+    }
+
+    function getInitialSlotRarity(quality, slotIndex) {
+      var map = {
+        'E': [['普通']],
+        'D': [['普通'], ['普通']],
+        'C': [['普通','稀有'], ['普通','稀有']],
+        'B': [['稀有'], ['稀有','史诗'], ['稀有','史诗']],
+        'A': [['史诗'], ['传说'], ['稀有','史诗']],
+        'S': [['传说'], ['神话'], ['史诗','传说'], ['史诗','传说']]
+      };
+      var slots = map[quality];
+      if (!slots || slotIndex > slots.length) return null;
+      var options = slots[slotIndex - 1];
+      return options[Math.floor(Math.random() * options.length)];
+    }
+
+    function getSkillSlotCount() {
+      return 6;
+    }
+
+    function getInitialSkillCount(quality) {
+      var base = { E:1, D:1, C:2, B:2, A:3, S:3 }[quality] || 1;
+      if (quality === 'D' && Math.random() < 0.5) base = 2;
+      if (quality === 'B' && Math.random() < 0.5) base = 3;
+      if (quality === 'S' && Math.random() < 0.5) base = 4;
+      return base;
+    }
+
+    function rollPassive(slotIndex) {
+      if (slotIndex === 1) return false;
+      return Math.random() < 0.25;
+    }
+
+    function buildSlotPrompt(charData, slotIndex, isPassive, fixedRarity) {
+      var element = charData.属性 || '无';
+      var combatType = charData.战斗类型 || '均衡型';
+      var quality = charData.品质 || 'E';
+      var name = charData.名称 || '角色';
+      var atk = charData.攻击力 || 0;
+      var spa = charData.特攻 || 0;
+      var isPhysical = atk >= spa;
+      var firstFormula = isPhysical ? 'physical_damage' : 'magic_damage';
+      var firstElement = isPhysical ? '无' : element;
+      var label = window.SLOT_LABELS[slotIndex];
+      var slotMaxRarity = fixedRarity || getSlotRarityLimit(quality, slotIndex);
+
+      var slotLine = '### 槽位 ' + slotIndex + (label ? ' (' + label.name + ')' : '') + '\n';
+      if (slotIndex === 1) {
+        slotLine += '【固定攻击位】\n- 元素属性=' + firstElement + ' (强制)\n- 类型=主动 (强制)\n- 消耗MP=0 (AI填0,引擎按稀有度自动扣除)\n- 冷却回合=0 (强制)\n- 效果公式=' + firstFormula + ' (强制)\n- 目标类型=single_enemy (强制)\n- 基础威力>0\n- 不可附加异常状态\n- ' + (isPhysical ? '物理技能,使用ATK计算,元素属性=无' : '元素技能,使用SpA计算,元素属性=角色元素') + '\n- 稀有度上限=' + getSlotRarityLimit(quality, 1) + '(强制)';
+      } else if (isPassive) {
+        slotLine += '【被动/天赋/光环】\n- 类型=被动 或 天赋 或 光环\n- 消耗MP=0 (强制)\n- 冷却回合=0 (强制)\n- 基础威力=0 (强制)\n- 效果公式=buff 或 debuff\n- 目标类型=self 或 ally 或 all_allies\n- 元素属性=无\n- 数值参数中使用持续回合/攻击加成/防御加成等buff参数\n- 引擎限制:被动仅有3种触发时机(on_attack/on_hit/on_low_hp),on_low_hp仅识别防御加成';
+      } else {
+        slotLine += '【开放位】\n- 类型=主动 (强制)\n- 消耗MP=0 (AI填0,引擎按稀有度自动扣除)\n- 效果公式: physical_damage | magic_damage | heal | buff | debuff | drain_physical | drain_magic | shield_damage\n- 目标类型: single_enemy | self | ally | all_enemies | all_allies\n- 元素属性推荐=' + element + ', 可变更\n- 元素分配建议: ' + combatType + '主属性约60%同元素+25%无属性+15%随机, 辅助技能(heal/buff)约70%无属性+30%同元素';
+      }
+
+      var typeEnum = slotIndex === 1 ? '"主动"' : (isPassive ? '"被动","天赋","光环"' : '"主动"');
+      var formulaEnum;
+      if (slotIndex === 1) {
+        formulaEnum = '"' + firstFormula + '" (固定)';
+      } else if (isPassive) {
+        formulaEnum = '"buff","debuff"';
+      } else {
+        formulaEnum = '"physical_damage","magic_damage","heal","buff","debuff","drain_physical","drain_magic","shield_damage"';
+      }
+      var targetEnum = slotIndex === 1 ? '"single_enemy" (固定)' : '"single_enemy","self","ally","all_enemies","all_allies"';
+
+      var rarityTable =
+        '\n\n## 稀有度数值范围(必须遵守)\n' +
+        '| 稀有度 | 系数范围 | 威力范围 | MP(引擎扣) | 冷却 |\n' +
+        '|--------|---------|---------|-----------|-----|\n' +
+        '| 普通 | 0.5~0.7 | 30~50 | 5 | 0 |\n' +
+        '| 稀有 | 0.7~0.9 | 50~80 | 12 | 0~1 |\n' +
+        '| 史诗 | 0.9~1.1 | 80~120 | 20 | 0~1 |\n' +
+        '| 传说 | 1.1~1.3 | 120~160 | 32 | 2~3 |\n' +
+        '| 神话 | 1.3~1.6 | 160~200+ | 45 | 3~4 |\n' +
+        '- 攻击技能的系数和基础威力必须在上表范围内\n' +
+        '- 治疗/buff/debuff/被动类: 基础威力可为0, 系数不适用\n' +
+        '- 第一技能冷却必为0, 稀有度上限=' + getSlotRarityLimit(quality, 1);
+
+      return '你是一个游戏技能生成器。必须严格遵循以下约束生成JSON格式的技能数据,不要输出其他文字。\n\n## 角色信息\n- 名称: ' + name + '\n- 元素属性: ' + element + '\n- 战斗类型: ' + combatType + '\n- 品质: ' + quality + '\n- 等级: ' + (charData.等级 || 1) + '\n- 攻击力: ' + atk + '\n- 特攻: ' + spa + '\n\n' + slotLine + rarityTable + '\n\n## 字段约束(必须遵守)\n\n1. name: 字符串,技能名称2~4个汉字\n\n2. 类型: 枚举值,只能取以下之一 → [' + typeEnum + ']\n\n3. 稀有度: 枚举值,只能取以下之一 → ["N","普通","稀有","史诗","传说","神话"]\n   ' + (fixedRarity ? '锁定为: ' + fixedRarity + ' (不可变更)' : '上限: ' + slotMaxRarity) + '\n\n4. 元素属性: 枚举值,只能取以下之一 → ["地","火","水","风","光","暗","无"]\n\n5. 消耗MP: 统一填0,引擎按稀有度自动扣除\n\n6. 冷却回合: 非负整数(0,1,2,3...)\n   被动/天赋/光环技能: 冷却回合必须=0\n\n7. 基础威力: 非负整数,伤害类技能必须>0,治疗/buff/debuff/被动类可为0\n\n8. 描述: 字符串,简短描述技能效果\n   攻击技能描述建议注明计算公式,如"(ATK×系数)+基础威力"\n\n9. 效果公式: 枚举值,只能取以下之一 → [' + formulaEnum + ']\n\n10. 目标类型: 枚举值,只能取以下之一 → [' + targetEnum + ']\n\n11. 数值参数: 对象,键只能从以下列表中选取:\n    ' + window.SKILL_PARAM_KEYS.join(', ') + '\n    值类型: 数字(整数或小数)\n    攻击技能必须包含系数字段\n    概率字段必须是0~1小数,命中率建议0.85~0.98,回合字段必须为正整数\n\n## 禁止项\n- 禁止创造"同时治疗和伤害"的技能(吸血请用drain_physical/drain_magic)\n- 禁止使用不在约束中的效果公式\n- 禁止使用不在列表中的数值参数键\n- 禁止缺少任何必填字段\n- 禁止技能包含复活/反弹/自爆/驱散/真实伤害/必定暴击/固定伤害值/一击必杀/斩杀线/偷取MP/禁止换人等引擎不支持的效果\n- 禁止自创元素属性或克制关系\n- 禁止被动技能造成伤害\n- 禁止条件自动选择目标(如"血量最低的敌人")\n- 禁止在描述中使用模糊词(如"大幅提升")\n- 禁止物理技能用SpA/元素技能用ATK\n\n## 输出格式\n只返回以下JSON,不要包含其他文字或markdown包裹:\n{\n  "name": "技能名",\n  "类型": "' + (isPassive ? '被动' : (slotIndex === 1 ? '主动' : '主动')) + '",\n  "稀有度": "' + (fixedRarity || slotMaxRarity) + '",\n  "元素属性": "' + (slotIndex === 1 ? firstElement : (isPassive ? '无' : element)) + '",\n  "消耗MP": 0,\n  "冷却回合": ' + (slotIndex === 1 ? 0 : (isPassive ? 0 : 1)) + ',\n  "基础威力": ' + (isPassive ? 0 : 60) + ',\n  "描述": "技能效果描述",\n  "效果公式": "' + (isPassive ? 'buff' : firstFormula) + '",\n  "目标类型": "' + (isPassive ? 'self' : (slotIndex === 1 ? 'single_enemy' : 'single_enemy')) + '",\n  "数值参数": {\n    "系数": 0.8\n  }\n}';
+    }
+
+    function extractJSON(text) {
+      text = text.trim();
+      var match = text.match(/```(?:json)?\s*(\[[\s\S]*?\]|\{[\s\S]*?\})\s*```/);
+      if (match) {
+        var parsed = JSON.parse(match[1]);
+        return Array.isArray(parsed) ? parsed[0] : parsed;
+      }
+      match = text.match(/\[(\{[\s\S]*\})\]/);
+      if (match) return JSON.parse(match[1]);
+      match = text.match(/\{[\s\S]*"name"[\s\S]*"稀有度"[\s\S]*\}/);
+      if (match) return JSON.parse(match[0]);
+      try { return JSON.parse(text); } catch(_) {}
+      try { return JSON.parse(text.replace(/^\[/, '').replace(/\]$/, '')); } catch(_) {}
+      throw new Error('无法解析JSON: ' + text.slice(0, 100));
+    }
+
+    function validateSkill(skill, slotIndex, charData) {
+      if (!skill || typeof skill !== 'object') skill = {};
+      if (!skill.name || typeof skill.name !== 'string') skill.name = '技能' + slotIndex;
+      if (!['主动', '被动', '天赋', '光环'].includes(skill.类型)) skill.类型 = '主动';
+      var isPassiveType = (skill.类型 === '被动' || skill.类型 === '天赋' || skill.类型 === '光环');
+      var isSlot1 = slotIndex === 1;
+      var quality = charData.品质 || 'E';
+      var slotMaxRarity = getSlotRarityLimit(quality, slotIndex);
+      if (isSlot1) {
+        var isPhysical = (charData.攻击力 || 0) >= (charData.特攻 || 0);
+        skill.类型 = '主动';
+        skill.冷却回合 = 0;
+        skill.目标类型 = 'single_enemy';
+        var slot1Formula = isPhysical ? 'physical_damage' : 'magic_damage';
+        var slot1Element = isPhysical ? '无' : (charData.属性 || '无');
+        skill.效果公式 = slot1Formula;
+        skill.元素属性 = slot1Element;
+        if (typeof skill.基础威力 !== 'number' || skill.基础威力 <= 0) skill.基础威力 = 30;
+        var s1maxIdx = window.SKILL_RARITY_ORDER.indexOf(slotMaxRarity);
+        var rIdx = window.SKILL_RARITY_ORDER.indexOf(skill.稀有度);
+        if (rIdx === -1 || rIdx > s1maxIdx) skill.稀有度 = '普通';
+      } else {
+        var maxIdx = window.SKILL_RARITY_ORDER.indexOf(slotMaxRarity);
+        var rIdx = window.SKILL_RARITY_ORDER.indexOf(skill.稀有度);
+        if (rIdx === -1 || rIdx > maxIdx) skill.稀有度 = slotMaxRarity;
+        if (!['地','火','水','风','光','暗','无'].includes(skill.元素属性)) skill.元素属性 = charData.属性 || '无';
+        if (typeof skill.冷却回合 !== 'number' || skill.冷却回合 < 0) skill.冷却回合 = 0;
+        if (isPassiveType) { skill.消耗MP = 0; skill.冷却回合 = 0; skill.基础威力 = 0; }
+        var validFormulas = ['physical_damage','magic_damage','heal','buff','debuff','drain_physical','drain_magic','shield_damage'];
+        if (!validFormulas.includes(skill.效果公式)) skill.效果公式 = isPassiveType ? 'buff' : 'physical_damage';
+        var validTargets = ['single_enemy','self','ally','all_enemies','all_allies'];
+        if (!skill.目标类型 || !validTargets.includes(skill.目标类型)) skill.目标类型 = isPassiveType ? 'self' : 'single_enemy';
+      }
+      if (typeof skill.消耗MP !== 'number' || skill.消耗MP < 0) skill.消耗MP = 0;
+      if (typeof skill.基础威力 !== 'number' || skill.基础威力 < 0) skill.基础威力 = 0;
+      if (!skill.描述 || typeof skill.描述 !== 'string') skill.描述 = '';
+      if (!skill.数值参数 || typeof skill.数值参数 !== 'object') skill.数值参数 = {};
+      Object.keys(skill.数值参数).forEach(function(k) {
+        if (window.SKILL_PARAM_KEYS.indexOf(k) === -1) delete skill.数值参数[k];
+      });
+      return skill;
+    }
+
+    async function generateSingleSkill(charName, charData, slotIndex, slotCount, isPassive, fixedRarity) {
+      var prompt = buildSlotPrompt(charData, slotIndex, isPassive, fixedRarity);
+      try {
+        var result = await generateRaw({
+          ordered_prompts: [{ role: 'system', content: prompt }],
+          should_silence: true,
+          temperature: 0.8
+        });
+        var text = typeof result === 'string' ? result : (result.content || '');
+        var skill = extractJSON(text);
+        validateSkill(skill, slotIndex, charData);
+        if (isPassive) {
+          skill.类型 = '被动';
+          skill.消耗MP = 0;
+          skill.冷却回合 = 0;
+          skill.基础威力 = 0;
+        }
+        return skill;
+      } catch (e) {
+        console.error('槽位' + slotIndex + '生成失败:', e);
+        try {
+          var result2 = await generateRaw({
+            ordered_prompts: [{ role: 'system', content: prompt + '\n\n注意: 只返回JSON,不要用```包裹,不要包含其他文字。' }],
+            should_silence: true,
+            temperature: 0.7
+          });
+          var text2 = typeof result2 === 'string' ? result2 : (result2.content || '');
+          var skill2 = extractJSON(text2);
+          validateSkill(skill2, slotIndex, charData);
+          return skill2;
+        } catch (e2) {
+          console.error('槽位' + slotIndex + '重试失败:', e2);
+          return null;
+        }
+      }
+    }
+
+    async function generateAllSkills(charName) {
+      if (!currentData || !currentData.角色数据 || !currentData.角色数据[charName]) {
+        notify('未找到角色数据', 'error');
+        return;
+      }
+      var charData = currentData.角色数据[charName];
+      var quality = charData.品质 || 'E';
+      var slotCount = getInitialSkillCount(quality);
+      notify('正在为 ' + charName + ' 生成技能 (品质' + quality + ', ' + slotCount + '槽位)...', 'info');
+      var skills = {};
+      var successCount = 0;
+      for (var i = 1; i <= slotCount; i++) {
+        var label = window.SLOT_LABELS[i];
+        var isPassive = rollPassive(i);
+        notify('生成技能中 (' + i + '/' + slotCount + '): ' + (label ? label.name : '槽位' + i) + (isPassive ? ' [被动]' : ''), 'info');
+        var initRarity = getInitialSlotRarity(quality, i);
+        var skill = await generateSingleSkill(charName, charData, i, slotCount, isPassive, initRarity);
+        if (skill) {
+          skills['槽位_' + i] = skill;
+          successCount++;
+        } else {
+          skills['槽位_' + i] = {
+            name: '未生成', 类型: '主动', 稀有度: 'N', 元素属性: charData.属性 || '无',
+            消耗MP: 0, 冷却回合: 0, 基础威力: 0, 描述: '生成失败，请重试',
+            效果公式: 'physical_damage', 目标类型: 'single_enemy', 数值参数: {}
+          };
+        }
+      }
+      try {
+        await updateVariablesWith(function(variables) {
+          skillBackupCache[charName] = _.get(variables, 'stat_data.角色数据.' + charName + '.技能', {});
+          _.set(variables, 'stat_data.角色数据.' + charName + '.技能', skills);
+          return variables;
+        }, { type: 'message' });
+        populateCharacterData();
+        Object.keys(learnMachineLock).forEach(function(k) {
+          if (k.indexOf(charName + '_') === 0) delete learnMachineLock[k];
+        });
+        notify(charName + ' 技能生成完成！成功' + successCount + '/' + slotCount, successCount === slotCount ? 'success' : 'warning');
+      } catch(e) {
+        console.error('技能数据写入失败:', e);
+        notify('技能数据写入失败', 'error');
+      }
+    }
+
+    async function refreshSingleSkill(charName, slotKey) {
+      if (!currentData || !currentData.角色数据 || !currentData.角色数据[charName]) {
+        notify('未找到角色数据', 'error');
+        return;
+      }
+      var charData = currentData.角色数据[charName];
+      var slotIndex = parseInt(slotKey.replace('槽位_', ''), 10);
+      var label = window.SLOT_LABELS[slotIndex];
+      var displayName = label ? label.name : slotKey;
+      var promptSlotIndex = !isNaN(slotIndex) ? slotIndex : 3;
+      var isPassive = rollPassive(promptSlotIndex);
+      notify('重铸 ' + displayName + (isPassive ? ' [被动]' : '') + '...', 'info');
+      var lockRarity = learnMachineLock[charName + '_' + slotIndex];
+      var skill = await generateSingleSkill(charName, charData, promptSlotIndex, getSkillSlotCount(), isPassive, lockRarity);
+      if (skill) {
+        try {
+          await updateVariablesWith(function(variables) {
+            var oldSkills = _.get(variables, 'stat_data.角色数据.' + charName + '.技能', {});
+            skillBackupCache[charName] = oldSkills;
+            var newSkills = {};
+            Object.keys(oldSkills).forEach(function(k) {
+              var m = k.match(/^槽位_(\d+)$/);
+              if (m && parseInt(m[1], 10) === slotIndex) return;
+              newSkills[k] = oldSkills[k];
+            });
+            var tpEntries = Object.entries(newSkills);
+            var tpSlots = {};
+            var tpNames = [];
+            tpEntries.forEach(function(e) {
+              var km = e[0].match(/^槽位_(\d+)$/);
+              if (km) { tpSlots[parseInt(km[1], 10)] = e[0]; }
+              else { tpNames.push(e[0]); }
+            });
+            var tns = 1;
+            tpNames.forEach(function(nk) {
+              while (tpSlots[tns]) tns++;
+              if (tns === slotIndex) { delete newSkills[nk]; }
+              tns++;
+            });
+            newSkills[slotKey] = skill;
+            _.set(variables, 'stat_data.角色数据.' + charName + '.技能', newSkills);
+            return variables;
+          }, { type: 'message' });
+          populateCharacterData();
+          notify((label ? label.name : slotKey) + ' 已重铸', 'success');
+        } catch(e) {
+          console.error('技能更新写入失败:', e);
+          notify('技能更新写入失败', 'error');
+        }
+      } else {
+        notify('重铸失败，请重试', 'error');
+      }
+    }
+
+    async function init() {
+      if (window._mobileStatusInitialized) return;
+      window._mobileStatusInitialized = true;
+      try {
+        await waitGlobalInitialized('Mvu');
+        populateCharacterData();
+        loadWarehouseData();
+        loadSenkiWarehouseData();
+
+        eventOn(Mvu.events.VARIABLE_UPDATE_ENDED, () => {
+          populateCharacterData();
+        });
+
+        $('#nav-chars').on('click', () => switchTab('chars'));
+        $('#nav-trainer').on('click', () => switchTab('trainer'));
+        $('#nav-bag').on('click', () => switchTab('bag'));
+        $('#nav-quest').on('click', () => switchTab('quest'));
+        $('#nav-shop').on('click', () => switchTab('shop'));
+
+        $('#modal-cancel').on('click', hidePurchaseModal);
+        $('#modal-confirm').on('click', confirmPurchase);
+        $('#shop-modal').on('click', function(e) {
+          if (e.target === this) hidePurchaseModal();
+        });
+
+        $('#wh-modal-cancel').on('click', hideWarehouseModal);
+        $('#wh-modal-confirm').on('click', confirmWarehouseAction);
+        $('#warehouse-modal').on('click', function(e) {
+          if (e.target === this) hideWarehouseModal();
+        });
+
+        $('#destroy-modal-cancel').on('click', hideDestroyModal);
+        $('#destroy-modal-confirm').on('click', confirmDestroyAction);
+        $('#destroy-modal').on('click', function(e) {
+          if (e.target === this) hideDestroyModal();
+        });
+
+        $('#del-modal-cancel').on('click', hideDeleteQuestModal);
+        $('#del-modal-confirm').on('click', confirmDeleteQuest);
+        $('#delete-quest-modal').on('click', function(e) {
+          if (e.target === this) hideDeleteQuestModal();
+        });
+
+        $('#claim-modal-cancel').on('click', hideClaimModal);
+        $('#claim-modal-confirm').on('click', confirmClaimReward);
+        $('#claim-modal').on('click', function(e) {
+          if (e.target === this) hideClaimModal();
+        });
+
+        $(document).on('click', '#btn-warehouse', function() {
+          showWarehouse();
+        });
+
+        $(document).on('click', '#btn-senki-warehouse', function() {
+          showSenkiWarehouse();
+        });
+
+        $(document).on('click', '.destroy-bag-btn', function(e) {
+          e.stopPropagation();
+          var name = $(this).data('destroy-name');
+          var maxQty = _.get(currentData, '背包.' + name + '.数量', 0);
+          showDestroyModal('bag', name, maxQty);
+        });
+
+        $(document).on('click', '.list-item, .collection-slot', function() {
+          const name = $(this).data('name');
+          const type = $(this).data('type');
+          var isColSlot = $(this).hasClass('collection-slot');
+          if (isColSlot) {
+            showSenkiWarehouse();
+          } else if (type === 'char') {
+            showCharDetail(name);
+          } else if (type === 'bag') {
+            showItemDetail(name, type);
+          } else if (type === 'quest') {
+            showItemDetail(name, type);
+          }
+        });
+
+        $(document).on('click', '.delete-quest-btn', function(e) {
+          e.stopPropagation();
+          var questId = $(this).data('quest-id');
+          showDeleteQuestModal(questId);
+        });
+
+        $(document).on('click', '.claim-reward-btn', function(e) {
+          e.stopPropagation();
+          var questId = $(this).data('quest-id');
+          showClaimModal(questId);
+        });
+
+        $(document).on('click', '#btn-store-senki', async function() {
+          var $btn = $(this);
+          $btn.prop('disabled', true).text('⏳');
+          try {
+            await depositSenki(selectedCharName);
+            goBack();
+          } catch(e) {
+            console.error(e);
+          } finally {
+            if ($btn.length) { $btn.prop('disabled', false).text('📦 存入仓库'); }
+          }
+        });
+
+        $(document).on('click', '#btn-use-learn', function() {
+          var name = $('#detail-name').text().replace('🎒 ', '');
+          showLearnModal(name);
+        });
+        $(document).on('click', '#learn-modal-cancel', hideLearnModal);
+        $(document).on('click', '#learn-modal-confirm', confirmLearnSkill);
+        $('#btn-back').on('click', goBack);
+        $('#btn-refresh').on('click', function() {
+          $(this).addClass('spinning');
+          populateCharacterData();
+          setTimeout(function() { $(this).removeClass('spinning'); }.bind(this), 500);
+        });
+
+        $(document).on('click', '#btn-quest-refresh-daily', async function() {
+          var $btn = $(this);
+          $btn.prop('disabled', true).text('⏳ 日常');
+          try {
+            var ok = await refreshQuests('日常任务');
+            populateCharacterData();
+            if (ok) { notify('日常任务已刷新', 'success'); } else { notify('刷新失败，请重试', 'error'); }
+          } catch(e) {
+            console.error('日常任务刷新失败:', e);
+            notify('刷新失败，请重试', 'error');
+          } finally {
+            $btn.prop('disabled', false).text('🔄 日常');
+          }
+        });
+
+        $(document).on('click', '#btn-quest-refresh-weekly', async function() {
+          var $btn = $(this);
+          $btn.prop('disabled', true).text('⏳ 周常');
+          try {
+            var ok = await refreshQuests('周常任务');
+            populateCharacterData();
+            if (ok) { notify('周常任务已刷新', 'success'); } else { notify('刷新失败，请重试', 'error'); }
+          } catch(e) {
+            console.error('周常任务刷新失败:', e);
+            notify('刷新失败，请重试', 'error');
+          } finally {
+            $btn.prop('disabled', false).text('📆 周常');
+          }
+        });
+        $('#btn-collapse').on('click', function() {
+          $('#app').toggleClass('collapsed');
+          $(this).text($('#app').hasClass('collapsed') ? '▲' : '▼');
+        });
+
+        $(document).on('click', '#btn-bond-archive', function() {
+          var charName = $(this).data('char-name');
+          showBondArchive(charName);
+        });
+        $(document).on('click', '#btn-restore-skills', async function() {
+          var charName = $(this).data('char-name');
+          $(this).prop('disabled', true).text('⏳ 恢复中...');
+          await restoreSkillsBackup(charName);
+        });
+        $(document).on('click', '.btn-gen-skills', async function() {
+          var charName = $(this).data('char-name');
+          $(this).prop('disabled', true).text('⏳ 生成中...');
+          await generateAllSkills(charName);
+          renderCurrentTab();
+        });
+        $(document).on('click', '.btn-refresh-skill', async function() {
+          var $btn = $(this);
+          var charName = $btn.data('char-name');
+          var slotKey = $btn.data('slot-key');
+          $btn.prop('disabled', true).text('⏳');
+          await refreshSingleSkill(charName, slotKey);
+          renderCurrentTab();
+        });
+        $(document).on('click', '.section-head', function() {
+          const section = $(this).data('section');
+          toggleSection(section);
+        });
+        $(document).on('click', '.category-header', function(e) {
+          const category = $(this).data('category');
+          toggleCategory(category, e);
+        });
+      } catch (e) {
+        console.error('初始化失败:', e);
+      }
+    }
+
+    $(errorCatched(init));
