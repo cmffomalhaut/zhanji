@@ -1086,6 +1086,49 @@
       font-size: 15px;
       padding: 4px;
     }
+    .archive-card {
+      background:rgba(30,41,59,0.6);
+      border:1px solid #334155;
+      border-radius:8px;
+      padding:12px;
+      margin-bottom:8px;
+      white-space:pre-wrap;
+      word-wrap:break-word;
+      font-size:12px;
+      line-height:1.7;
+      color:#e2e8f0;
+      max-height:420px;
+      overflow-y:auto;
+    }
+    .archive-card .archive-title {
+      font-size:14px;
+      font-weight:bold;
+      color:#f59e0b;
+      text-align:center;
+      margin-bottom:8px;
+    }
+    .archive-card .archive-meta {
+      font-size:11px;
+      color:#94a3b8;
+      margin-bottom:8px;
+      text-align:center;
+    }
+    .archive-card .archive-divider {
+      border:none;
+      border-top:1px solid #334155;
+      margin:8px 0;
+    }
+    .archive-btn {
+      padding:8px 16px;
+      font-size:13px;
+      border:none;
+      border-radius:6px;
+      cursor:pointer;
+      transition:all 0.2s;
+      font-family:inherit;
+    }
+    .archive-btn:hover { filter:brightness(1.15); }
+    .archive-btn:disabled { opacity:0.5; cursor:not-allowed; filter:none; }
   </style>
 
   <script type="module">
@@ -2731,6 +2774,12 @@ function renderCharsList($scroll) {
     }
 
     function goBack() {
+      if (currentView === 'archive') {
+        currentView = 'detail';
+        selectedCharName = archiveState.charName;
+        showCharDetail(archiveState.charName);
+        return;
+      }
       currentView = 'list';
       selectedCharName = null;
 
@@ -2738,6 +2787,164 @@ function renderCharsList($scroll) {
       $(`#panel-${currentTab}`).addClass('active');
 
       renderList(currentTab);
+    }
+
+    var archiveState = { charName: null, messageCount: 8 };
+
+    function showBondArchive(charName) {
+      var data = _.get(currentData, '角色数据.' + charName, null);
+      if (!data) { notify('角色数据不存在', 'error'); return; }
+
+      archiveState.charName = charName;
+      currentView = 'archive';
+
+      var archive = data.羁绊档案;
+      if (archive) {
+        renderBondArchive(charName, archive);
+      } else {
+        promptBondArchiveGeneration(charName);
+      }
+    }
+
+    function promptBondArchiveGeneration(charName) {
+      var $scroll = $('#detail-scroll');
+      var isLatest = getCurrentMessageId() === getLastMessageId();
+
+      $('#detail-name').text('📖 羁绊档案');
+      $('#detail-badge').text(charName);
+      $('#detail-owner').html('');
+      $('#detail-actions').html('');
+
+      $scroll.html(
+        '<div style="text-align:center;padding:20px;">' +
+        '<div style="color:#94a3b8;font-size:13px;margin-bottom:12px;">还未生成羁绊档案</div>' +
+        '<div style="margin-bottom:12px;">' +
+        '<label style="color:#cbd5e1;font-size:12px;">选择作为上下文的最近楼层数: </label>' +
+        '<input type="number" id="archive-msg-count" value="8" min="0" max="12" style="width:60px;padding:4px 8px;border-radius:4px;border:1px solid #475569;background:#1e293b;color:#e2e8f0;font-size:13px;text-align:center;">' +
+        '<span style="color:#64748b;font-size:11px;margin-left:4px;">(0-12)</span>' +
+        '</div>' +
+        (isLatest ? '' : '<div style="color:#ef4444;font-size:11px;margin-bottom:8px;">⚠ 请在最新楼层操作</div>') +
+        '<button class="archive-btn" id="btn-generate-archive" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;"' + (isLatest ? '' : ' disabled') + '>🎯 开始生成</button>' +
+        '</div>'
+      );
+
+      $('#btn-generate-archive').off('click').on('click', function() {
+        var count = parseInt($('#archive-msg-count').val()) || 8;
+        if (count < 0) count = 0;
+        if (count > 12) count = 12;
+        generateBondArchive(charName, count);
+      });
+    }
+
+    function renderBondArchive(charName, archive) {
+      var $scroll = $('#detail-scroll');
+      var isLatest = getCurrentMessageId() === getLastMessageId();
+
+      $('#detail-name').text('📖 羁绊档案');
+      $('#detail-badge').text(charName);
+      $('#detail-owner').html('');
+      $('#detail-actions').html(
+        '<button class="archive-btn" id="btn-refresh-archive" style="background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;font-size:11px;padding:4px 10px;"' + (isLatest ? '' : ' disabled') + '>🔄 刷新</button>'
+      );
+
+      var content = archive;
+      content = content.replace(/<\/?senki_archive>/gi, '');
+      content = content.replace(/<\/?thinking>/gi, '');
+      content = content.replace(/<[^>]*>/g, '');
+
+      $scroll.html(
+        '<div class="archive-card">' + content.replace(/\n/g, '<br>') + '</div>'
+      );
+
+      $('#btn-refresh-archive').off('click').on('click', function() {
+        if (!isLatest) { notify('请在最新楼层操作', 'warning'); return; }
+        promptBondArchiveGeneration(charName);
+      });
+    }
+
+    async function generateBondArchive(charName, messageCount) {
+      if (getCurrentMessageId() !== getLastMessageId()) { notify('请在最新楼层操作', 'warning'); return; }
+
+      var $scroll = $('#detail-scroll');
+      $scroll.html('<div style="text-align:center;padding:30px;color:#94a3b8;">⏳ 正在生成羁绊档案（使用最近 ' + messageCount + ' 条聊天记录作为上下文）...</div>');
+
+      try {
+        var charData = _.get(currentData, '角色数据.' + charName, {});
+        var chatMessages = [];
+
+        if (messageCount > 0) {
+          chatMessages = getChatMessages('-' + messageCount + '-' + '-1', { role: 'all', hide_state: 'unhidden' });
+        }
+
+        var chatContext = '';
+        if (chatMessages.length > 0) {
+          chatContext = chatMessages.map(function(m) {
+            var roleLabel = m.role === 'user' ? '玩家' : (m.role === 'assistant' ? (m.name || '助理') : '系统');
+            return '[' + roleLabel + ']: ' + m.message;
+          }).join('\n\n');
+        } else {
+          chatContext = '（无可用聊天上下文）';
+        }
+
+        var archivePrompt = [
+          '# 战后羁绊档案生成',
+          '',
+          '## 战姬数据',
+          '名称: ' + charName,
+          '品质: ' + (charData.品质 || 'E'),
+          '等级: ' + (charData.等级 || 1),
+          '属性: ' + (charData.属性 || '无'),
+          '外貌: ' + (charData.外貌 || '未设定'),
+          '性格: ' + (charData.性格 || '未设定'),
+          '性器状态: ' + JSON.stringify(charData.性器状态 || {}),
+          '个人资料: ' + JSON.stringify(charData.个人资料 || {}),
+          '',
+          '## 最近聊天上下文 (' + chatMessages.length + '条)',
+          chatContext,
+          '',
+          '## 羁绊档案格式要求',
+          '请根据以上战姬数据和聊天上下文，生成一份战后羁绊档案（羁绊档案）。',
+          '用 <senki_archive> 标签包裹档案正文。',
+          '字数: 1200~2000字，第三人称R18小说风格。',
+          '档案需包含：战姬与前主人的关系起源、调教经历（2-3个场景）、外貌与身体描写、被夺走瞬间的心理状态。',
+          '如果聊天上下文中包含前主人信息，请使用；否则根据战姬数据合理推断或随机生成。',
+          '前主人不存在时，请合理虚构一个前主人。',
+          '注意: 必须是NTR风格，描写被夺走的撕裂感。',
+          '使用中文，详细、淫靡、情感细腻。',
+          '所有外貌描写必须具体，禁止使用模糊词汇。'
+        ].join('\n');
+
+        var result = await generateRaw({
+          ordered_prompts: [{ role: 'system', content: archivePrompt }],
+          should_silence: true,
+          temperature: 0.85
+        });
+
+        var text = typeof result === 'string' ? result : (result.content || '');
+        if (!text) throw new Error('生成结果为空');
+
+        await updateVariablesWith(function(variables) {
+          _.set(variables, 'stat_data.角色数据.' + charName + '.羁绊档案', text);
+          return variables;
+        }, { type: 'message' });
+
+        populateCharacterData();
+        var updatedData = _.get(currentData, '角色数据.' + charName, {});
+        notify(charName + ' 羁绊档案已生成', 'success');
+        renderBondArchive(charName, text);
+
+      } catch(e) {
+        console.error('羁绊档案生成失败:', e);
+        $scroll.html(
+          '<div style="text-align:center;padding:20px;">' +
+          '<div style="color:#ef4444;font-size:12px;margin-bottom:8px;">生成失败: ' + (e.message || '未知错误') + '</div>' +
+          '<button class="archive-btn" id="btn-retry-archive" style="background:#6366f1;color:#fff;">🔄 重试</button>' +
+          '</div>'
+        );
+        $('#btn-retry-archive').off('click').on('click', function() {
+          promptBondArchiveGeneration(charName);
+        });
+      }
     }
 
     function getFormTag(form) {
@@ -3053,6 +3260,12 @@ function renderCharsList($scroll) {
           </div>
         </div>
       `;
+
+      var hasArchive = !!data.羁绊档案;
+      var archiveBtnText = hasArchive ? '📖 查看羁绊档案' : '📖 生成羁绊档案';
+      html += '<div style="padding:8px 0;text-align:center;">' +
+        '<button class="archive-btn" id="btn-bond-archive" data-char-name="' + name + '" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;">' + archiveBtnText + '</button>' +
+        '</div>';
 
       $scroll.html(html);
 
@@ -3548,7 +3761,10 @@ function renderCharsList($scroll) {
           $(this).text($('#app').hasClass('collapsed') ? '▲' : '▼');
         });
 
-        $(document).on('click', '.btn-gen-skills', async function() {
+        $(document).on('click', '#btn-bond-archive', function() {
+          var charName = $(this).data('char-name');
+          showBondArchive(charName);
+        });
           var charName = $(this).data('char-name');
           $(this).prop('disabled', true).text('⏳ 生成中...');
           await generateAllSkills(charName);
