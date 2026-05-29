@@ -2366,12 +2366,28 @@ function renderCharsList($scroll) {
         await updateVariablesWith(function(variables) {
           var oldSkills = _.get(variables, 'stat_data.角色数据.' + charName + '.技能', {});
           skillBackupCache[charName] = oldSkills;
-          var cleaned = {};
+          var newSkills = {};
           Object.keys(oldSkills).forEach(function(k) {
-            if (/^槽位_\d+$/.test(k)) { cleaned[k] = oldSkills[k]; }
+            var m = k.match(/^槽位_(\d+)$/);
+            if (m && parseInt(m[1], 10) === slotIndex) return;
+            newSkills[k] = oldSkills[k];
           });
-          cleaned[slotKey] = skill;
-          _.set(variables, 'stat_data.角色数据.' + charName + '.技能', cleaned);
+          var tpEntries = Object.entries(newSkills);
+          var tpSlots = {};
+          var tpNames = [];
+          tpEntries.forEach(function(e) {
+            var km = e[0].match(/^槽位_(\d+)$/);
+            if (km) { tpSlots[parseInt(km[1], 10)] = e[0]; }
+            else { tpNames.push(e[0]); }
+          });
+          var tns = 1;
+          tpNames.forEach(function(nk) {
+            while (tpSlots[tns]) tns++;
+            if (tns === slotIndex) { delete newSkills[nk]; }
+            tns++;
+          });
+          newSkills[slotKey] = skill;
+          _.set(variables, 'stat_data.角色数据.' + charName + '.技能', newSkills);
           var bp = _.get(variables, 'stat_data.背包.' + state.itemName, {});
           if (bp.数量) {
             bp.数量 = (bp.数量 || 1) - 1;
@@ -3777,12 +3793,28 @@ function renderCharsList($scroll) {
           await updateVariablesWith(function(variables) {
             var oldSkills = _.get(variables, 'stat_data.角色数据.' + charName + '.技能', {});
             skillBackupCache[charName] = oldSkills;
-            var cleaned = {};
+            var newSkills = {};
             Object.keys(oldSkills).forEach(function(k) {
-              if (/^槽位_\d+$/.test(k)) { cleaned[k] = oldSkills[k]; }
+              var m = k.match(/^槽位_(\d+)$/);
+              if (m && parseInt(m[1], 10) === slotIndex) return;
+              newSkills[k] = oldSkills[k];
             });
-            cleaned[slotKey] = skill;
-            _.set(variables, 'stat_data.角色数据.' + charName + '.技能', cleaned);
+            var tpEntries = Object.entries(newSkills);
+            var tpSlots = {};
+            var tpNames = [];
+            tpEntries.forEach(function(e) {
+              var km = e[0].match(/^槽位_(\d+)$/);
+              if (km) { tpSlots[parseInt(km[1], 10)] = e[0]; }
+              else { tpNames.push(e[0]); }
+            });
+            var tns = 1;
+            tpNames.forEach(function(nk) {
+              while (tpSlots[tns]) tns++;
+              if (tns === slotIndex) { delete newSkills[nk]; }
+              tns++;
+            });
+            newSkills[slotKey] = skill;
+            _.set(variables, 'stat_data.角色数据.' + charName + '.技能', newSkills);
             return variables;
           }, { type: 'message' });
           populateCharacterData();
