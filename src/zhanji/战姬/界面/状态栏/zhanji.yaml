@@ -591,6 +591,49 @@
       background: rgba(239, 68, 68, 0.15);
       border-radius: 5px;
     }
+    .archive-card {
+      background:rgba(30,41,59,0.6);
+      border:1px solid #334155;
+      border-radius:8px;
+      padding:12px;
+      margin-bottom:8px;
+      white-space:pre-wrap;
+      word-wrap:break-word;
+      font-size:12px;
+      line-height:1.7;
+      color:#e2e8f0;
+      max-height:420px;
+      overflow-y:auto;
+    }
+    .archive-card .archive-title {
+      font-size:14px;
+      font-weight:bold;
+      color:#f59e0b;
+      text-align:center;
+      margin-bottom:8px;
+    }
+    .archive-card .archive-meta {
+      font-size:11px;
+      color:#94a3b8;
+      margin-bottom:8px;
+      text-align:center;
+    }
+    .archive-card .archive-divider {
+      border:none;
+      border-top:1px solid #334155;
+      margin:8px 0;
+    }
+    .archive-btn {
+      padding:8px 16px;
+      font-size:13px;
+      border:none;
+      border-radius:6px;
+      cursor:pointer;
+      transition:all 0.2s;
+      font-family:inherit;
+    }
+    .archive-btn:hover { filter:brightness(1.15); }
+    .archive-btn:disabled { opacity:0.5; cursor:not-allowed; filter:none; }
 
     .equip-item {
       display: flex;
@@ -1086,49 +1129,6 @@
       font-size: 15px;
       padding: 4px;
     }
-    .archive-card {
-      background:rgba(30,41,59,0.6);
-      border:1px solid #334155;
-      border-radius:8px;
-      padding:12px;
-      margin-bottom:8px;
-      white-space:pre-wrap;
-      word-wrap:break-word;
-      font-size:12px;
-      line-height:1.7;
-      color:#e2e8f0;
-      max-height:420px;
-      overflow-y:auto;
-    }
-    .archive-card .archive-title {
-      font-size:14px;
-      font-weight:bold;
-      color:#f59e0b;
-      text-align:center;
-      margin-bottom:8px;
-    }
-    .archive-card .archive-meta {
-      font-size:11px;
-      color:#94a3b8;
-      margin-bottom:8px;
-      text-align:center;
-    }
-    .archive-card .archive-divider {
-      border:none;
-      border-top:1px solid #334155;
-      margin:8px 0;
-    }
-    .archive-btn {
-      padding:8px 16px;
-      font-size:13px;
-      border:none;
-      border-radius:6px;
-      cursor:pointer;
-      transition:all 0.2s;
-      font-family:inherit;
-    }
-    .archive-btn:hover { filter:brightness(1.15); }
-    .archive-btn:disabled { opacity:0.5; cursor:not-allowed; filter:none; }
   </style>
 
   <script type="module">
@@ -2789,17 +2789,14 @@ function renderCharsList($scroll) {
       renderList(currentTab);
     }
 
-    var archiveState = { charName: null, messageCount: 8 };
+    var archiveCache = {};
 
     function showBondArchive(charName) {
       var data = _.get(currentData, '角色数据.' + charName, null);
       if (!data) { notify('角色数据不存在', 'error'); return; }
-
       archiveState.charName = charName;
       currentView = 'archive';
-
-      var archive = null;
-      try { archive = localStorage.getItem('zhanji_bond_archive_' + charName); } catch(e) {}
+      var archive = archiveCache[charName] || null;
       if (archive) {
         renderBondArchive(charName, archive);
       } else {
@@ -3039,7 +3036,7 @@ function renderCharsList($scroll) {
         var text = typeof result === 'string' ? result : (result.content || '');
         if (!text) throw new Error('生成结果为空');
 
-        try { localStorage.setItem('zhanji_bond_archive_' + charName, text); } catch(e) { console.error('存档保存失败:', e); notify('存档保存失败', 'warning'); return; }
+        archiveCache[charName] = text;
 
         notify(charName + ' 羁绊档案已生成', 'success');
         renderBondArchive(charName, text);
@@ -3372,8 +3369,7 @@ function renderCharsList($scroll) {
         </div>
       `;
 
-      var hasArchive = false;
-      try { hasArchive = !!localStorage.getItem('zhanji_bond_archive_' + name); } catch(e) {}
+      var hasArchive = !!archiveCache[name];
       var archiveBtnText = hasArchive ? '📖 查看羁绊档案' : '📖 生成羁绊档案';
       html += '<div style="padding:8px 0;text-align:center;">' +
         '<button class="archive-btn" id="btn-bond-archive" data-char-name="' + name + '" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;">' + archiveBtnText + '</button>' +
